@@ -1,0 +1,217 @@
+import axios from 'axios'
+import log from 'electron-log'
+import type { ChatMessage, SystemContext } from '../../shared/types'
+
+const NVIDIA_NIM_BASE_URL = 'https://integrate.api.nvidia.com/v1'
+const DEFAULT_MODEL = 'meta/llama3-8b-instruct'
+
+export class AIService {
+  async chat(
+    messages: ChatMessage[],
+    systemContext: SystemContext,
+    apiKey: string,
+    model = DEFAULT_MODEL
+  ): Promise<{ content: string; error?: string }> {
+    if (!apiKey) {
+      return {
+        content: this.getOfflineResponse(messages, systemContext),
+        error: undefined
+      }
+    }
+
+    try {
+      const systemPrompt = this.buildSystemPrompt(systemContext)
+      const payload = {
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...messages
+            .filter((m) => m.role !== 'system')
+            .map((m) => ({ role: m.role, content: m.content }))
+        ],
+        temperature: 0.4,
+        max_tokens: 1024,
+        stream: false
+      }
+
+      const response = await axios.post(`${NVIDIA_NIM_BASE_URL}/chat/completions`, payload, {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 30000
+      })
+
+      const content = response.data?.choices?.[0]?.message?.content ?? ''
+      return { content }
+    } catch (err) {
+      log.error('AI chat error:', err)
+      const errorMsg = axios.isAxiosError(err) ? err.message : String(err)
+      return {
+        content: `⚠️ No se pudo conectar con el servicio de IA: ${errorMsg}`,
+        error: errorMsg
+      }
+    }
+  }
+
+  async analyze(
+    systemContext: SystemContext,
+    apiKey: string,
+    model = DEFAULT_MODEL
+  ): Promise<{ recommendations: string[]; summary: string; error?: string }> {
+    if (!apiKey) {
+      return this.getOfflineAnalysis(systemContext)
+    }
+
+    try {
+      const prompt = this.buildAnalysisPrompt(systemContext)
+      const response = await axios.post(
+        `${NVIDIA_NIM_BASE_URL}/chat/completions`,
+        {
+          model,
+          messages: [
+            {
+              role: 'system',
+              content: 'Eres un experto en optimización de sistemas Windows. Responde SIEMPRE en español. Sé conciso y práctico.'
+            },
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0.3,
+          max_tokens: 1024,
+          stream: false
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 30000
+        }
+      )
+
+      const raw = response.data?.choices?.[0]?.message?.content ?? ''
+      return this.parseAnalysisResponse(raw)
+    } catch (err) {
+      log.error('AI analyze error:', err)
+      return this.getOfflineAnalysis(systemContext)
+    }
+  }
+
+  private buildSystemPrompt(ctx: SystemContext): string {
+    const { metrics, recentActions, topProcesses } = ctx
+    const lines: string[] = [
+      'Eres el asistente de diagnóstico de NitroFlow, un optimizador inteligente de Windows.',
+      'Responde SIEMPRE en español. Sé útil, preciso y conciso.',
+      'IMPORTANTE: Solo puedes recomendar acciones, nunca ejecutarlas directamente.',
+      '',
+      '=== ESTADO ACTUAL DEL SISTEMA ==='
+    ]
+
+    if (metrics) {
+      lines.push(`CPU: ${metrics.cpu.usagePercent}% (${metrics.cpu.model})`)
+      lines.push(`RAM: ${metrics.ram.usedMB} MB / ${metrics.ram.totalMB} MB (${metrics.ram.usagePercent}%)`)
+      if (metrics.disk.length > 0) {
+        metrics.disk.forEach((d) => {
+          lines.push(`Disco ${d.drive}: ${d.usedGB} GB / ${d.totalGB} GB (${d.usagePercent}%)`)
+        })
+      }
+    }
+
+    if (topProcesses.length > 0) {
+      lines.push('', '=== PROCESOS CON MÁS RECURSOS ===')
+      topProcesses.slice(0, 5).forEach((p) => {
+        lines.push(`- ${p.name}: CPU ${p.cpuPercent}%, RAM ${p.ramMB} MB`)
+      })
+    }
+
+    if (recentActions.length > 0) {
+      lines.push('', '=== ACCIONES RECIENTES ===')
+      recentActions.slice(0, 5).forEach((a) => {
+        lines.push(`- [${new Date(a.timestamp).toLocaleTimeString()}] ${a.description}`)
+      })
+    }
+
+    if (ctx.issues.length > 0) {
+      lines.push('', '=== PROBLEMAS DETECTADOS ===')
+      ctx.issues.forEach((issue) => lines.push(`- ${issue}`))
+    }
+
+    return lines.join('\n')
+  }
+
+  private buildAnalysisPrompt(ctx: SystemContext): string {
+    const systemInfo = this.buildSystemPrompt(ctx)
+    return `${systemInfo}
+
+Analiza el estado del sistema y proporciona:
+1. Un resumen en 1-2 oraciones del estado general del sistema
+2. Las 3-5 recomendaciones más importantes para mejorar el rendimiento
+3. Cada recomendación debe ser específica y accionable
+
+Formato de respuesta (JSON):
+{
+  "summary": "...",
+  "recommendations": ["rec1", "rec2", "rec3"]
+}`
+  }
+
+  private parseAnalysisResponse(raw: string): {
+    recommendations: string[]
+    summary: string
+    error?: string
+  } {
+    try {
+      const jsonMatch = raw.match(/\{[\s\S]*\}/)
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0])
+        return {
+          summary: parsed.summary ?? '',
+          recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations : []
+        }
+      }
+    } catch {
+      // Fallback: parse as plain text
+    }
+    return {
+      summary: raw.split('\n')[0] ?? 'Análisis completado',
+      recommendations: raw
+        .split('\n')
+        .filter((l) => l.match(/^\d+\.|^-/))
+        .map((l) => l.replace(/^\d+\.\s*|-\s*/, '').trim())
+        .filter(Boolean)
+        .slice(0, 5)
+    }
+  }
+
+  private getOfflineResponse(messages: ChatMessage[], ctx: SystemContext): string {
+    const lastMessage = messages.filter((m) => m.role === 'user').at(-1)?.content ?? ''
+    const lower = lastMessage.toLowerCase()
+
+    if (lower.includes('lento') || lower.includes('rendimiento')) {
+      const cpuPct = ctx.metrics?.cpu.usagePercent ?? 0
+      const ramPct = ctx.metrics?.ram.usagePercent ?? 0
+      return `🔍 **Análisis offline del rendimiento:**\n\n- CPU: ${cpuPct}% ${cpuPct > 70 ? '⚠️ Alto uso' : '✅ Normal'}\n- RAM: ${ramPct}% ${ramPct > 80 ? '⚠️ Alta presión' : '✅ Normal'}\n\n💡 Para un análisis preciso, configura una API key de NVIDIA NIM en Ajustes.`
+    }
+    return `💡 Para obtener respuestas inteligentes sobre tu sistema, configura tu API key de NVIDIA NIM en los ajustes.\n\nMientras tanto, puedes usar las herramientas de limpieza, gestión de procesos y registro para optimizar tu sistema.`
+  }
+
+  private getOfflineAnalysis(ctx: SystemContext): {
+    recommendations: string[]
+    summary: string
+  } {
+    const recs: string[] = []
+    const m = ctx.metrics
+    if (m) {
+      if (m.cpu.usagePercent > 70) recs.push('Revisa los procesos con alto uso de CPU en el gestor de procesos')
+      if (m.ram.usagePercent > 80) recs.push('Considera cerrar aplicaciones pesadas para liberar RAM')
+      if (m.disk.some((d) => d.usagePercent > 85)) recs.push('Ejecuta la limpieza del sistema para liberar espacio en disco')
+    }
+    recs.push('Ejecuta la limpieza de archivos temporales para mejorar el rendimiento')
+    recs.push('Revisa los programas de inicio y desactiva los que no sean necesarios')
+
+    return {
+      summary: 'Análisis offline: configura la API key de NVIDIA NIM para recomendaciones personalizadas.',
+      recommendations: recs
+    }
+  }
+}
