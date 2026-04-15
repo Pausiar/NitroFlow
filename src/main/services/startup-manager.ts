@@ -1,9 +1,6 @@
-import { exec } from 'child_process'
-import { promisify } from 'util'
 import log from 'electron-log'
+import { runPowerShell } from '../utils/powershell'
 import type { StartupEntry } from '../../shared/types'
-
-const execAsync = promisify(exec)
 
 export class StartupManager {
   private entries: Map<string, StartupEntry> = new Map()
@@ -15,8 +12,6 @@ export class StartupManager {
     try {
       const ps = `
         $entries = @()
-
-        # HKCU Run
         $hkcuRun = 'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run'
         $props = Get-ItemProperty $hkcuRun -ErrorAction SilentlyContinue
         if ($props) {
@@ -30,8 +25,6 @@ export class StartupManager {
             }
           }
         }
-
-        # HKLM Run
         $hklmRun = 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run'
         $props = Get-ItemProperty $hklmRun -ErrorAction SilentlyContinue
         if ($props) {
@@ -45,8 +38,6 @@ export class StartupManager {
             }
           }
         }
-
-        # Startup folder
         $startupFolder = [Environment]::GetFolderPath('Startup')
         Get-ChildItem $startupFolder -ErrorAction SilentlyContinue | ForEach-Object {
           $entries += [PSCustomObject]@{
@@ -57,15 +48,11 @@ export class StartupManager {
             Enabled = $true
           }
         }
-
         $entries | ConvertTo-Json
       `
-      const { stdout } = await execAsync(
-        `powershell -NoProfile -Command "${ps.replace(/"/g, '\\"')}"`,
-        { timeout: 15000 }
-      )
+      const stdout = await runPowerShell(ps, 15000)
       if (!stdout.trim()) return []
-      const raw = JSON.parse(stdout.trim())
+      const raw = JSON.parse(stdout)
       const items = Array.isArray(raw) ? raw : [raw]
       return items.map((item: Record<string, unknown>) => {
         const entry: StartupEntry = {
@@ -91,7 +78,6 @@ export class StartupManager {
     if (process.platform !== 'win32') {
       return { success: true }
     }
-    // We use the "RunOnce" trick: move disabled entries to a separate disabled key
     const entry = this.entries.get(id)
     if (!entry) {
       return { success: false, error: `Entrada no encontrada: ${id}` }
@@ -102,22 +88,14 @@ export class StartupManager {
           ? 'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run'
           : 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run'
 
-      if (enabled) {
-        // Re-enable: set approval bytes to 02 00 00 00 00 00 00 00 00 00 00 00
-        const ps = `
-          $val = [byte[]](2,0,0,0,0,0,0,0,0,0,0,0)
-          Set-ItemProperty -Path '${disabledKey}' -Name '${entry.name}' -Value $val -Type Binary
-        `
-        await execAsync(`powershell -NoProfile -Command "${ps}"`, { timeout: 5000 })
-      } else {
-        // Disable: set approval bytes to 03 00 00 00 ...
-        const ps = `
-          if (!(Test-Path '${disabledKey}')) { New-Item -Path '${disabledKey}' -Force | Out-Null }
-          $val = [byte[]](3,0,0,0,0,0,0,0,0,0,0,0)
-          Set-ItemProperty -Path '${disabledKey}' -Name '${entry.name}' -Value $val -Type Binary
-        `
-        await execAsync(`powershell -NoProfile -Command "${ps}"`, { timeout: 5000 })
-      }
+      const safeName = entry.name.replace(/'/g, "''")
+      const safeKey = disabledKey.replace(/'/g, "''")
+
+      const ps = enabled
+        ? `$val = [byte[]](2,0,0,0,0,0,0,0,0,0,0,0); Set-ItemProperty -Path '${safeKey}' -Name '${safeName}' -Value $val -Type Binary`
+        : `if (!(Test-Path '${safeKey}')) { New-Item -Path '${safeKey}' -Force | Out-Null }; $val = [byte[]](3,0,0,0,0,0,0,0,0,0,0,0); Set-ItemProperty -Path '${safeKey}' -Name '${safeName}' -Value $val -Type Binary`
+
+      await runPowerShell(ps, 5000)
       entry.enabled = enabled
       this.entries.set(id, entry)
       return { success: true }

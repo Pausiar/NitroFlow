@@ -1,6 +1,7 @@
 import { exec } from 'child_process'
 import { promisify } from 'util'
 import log from 'electron-log'
+import { runPowerShell } from '../utils/powershell'
 import { PROTECTED_PROCESSES } from '../utils/security'
 import type { ProcessInfo, ServiceInfo } from '../../shared/types'
 
@@ -17,11 +18,8 @@ export class ProcessManager {
         Sort-Object CPU -Descending | Select-Object -First 50 |
         ConvertTo-Json
       `
-      const { stdout } = await execAsync(
-        `powershell -NoProfile -Command "${ps.replace(/"/g, '\\"')}"`,
-        { timeout: 10000 }
-      )
-      const raw: unknown[] = JSON.parse(stdout.trim())
+      const stdout = await runPowerShell(ps, 10000)
+      const raw: unknown[] = JSON.parse(stdout)
       const items = Array.isArray(raw) ? raw : [raw]
       return items.map((p: unknown) => {
         const proc = p as Record<string, unknown>
@@ -47,23 +45,21 @@ export class ProcessManager {
     if (process.platform !== 'win32') {
       return { success: true }
     }
+    // Validate pid is a safe integer
+    if (!Number.isInteger(pid) || pid <= 0) {
+      return { success: false, error: 'PID inválido' }
+    }
     try {
       // First verify the process is not protected
-      const ps = `
+      const checkPs = `
         $proc = Get-Process -Id ${pid} -ErrorAction SilentlyContinue
         if ($proc) { $proc.ProcessName } else { '' }
       `
-      const { stdout } = await execAsync(
-        `powershell -NoProfile -Command "${ps.replace(/"/g, '\\"')}"`,
-        { timeout: 5000 }
-      )
-      const name = stdout.trim().toLowerCase()
+      const name = (await runPowerShell(checkPs, 5000)).trim().toLowerCase()
       if (PROTECTED_PROCESSES.has(name)) {
         return { success: false, error: `El proceso "${name}" está protegido y no puede terminarse` }
       }
-      await execAsync(`powershell -NoProfile -Command "Stop-Process -Id ${pid} -Force"`, {
-        timeout: 5000
-      })
+      await runPowerShell(`Stop-Process -Id ${pid} -Force`, 5000)
       return { success: true }
     } catch (err) {
       log.error('killProcess error:', err)
@@ -80,11 +76,8 @@ export class ProcessManager {
         Get-Service | Select-Object Name, DisplayName, Status, StartType, Description |
         ConvertTo-Json
       `
-      const { stdout } = await execAsync(
-        `powershell -NoProfile -Command "${ps.replace(/"/g, '\\"')}"`,
-        { timeout: 15000 }
-      )
-      const raw: unknown[] = JSON.parse(stdout.trim())
+      const stdout = await runPowerShell(ps, 15000)
+      const raw: unknown[] = JSON.parse(stdout)
       const items = Array.isArray(raw) ? raw : [raw]
       return items.map((s: unknown) => {
         const svc = s as Record<string, unknown>
@@ -110,21 +103,25 @@ export class ProcessManager {
     if (process.platform !== 'win32') {
       return { success: true }
     }
+    // Sanitize service name: allow only alphanumeric, underscore, hyphen, dot
     const safeName = name.replace(/[^a-zA-Z0-9_\-.]/g, '')
+    if (!safeName || safeName !== name) {
+      return { success: false, error: 'Nombre de servicio inválido' }
+    }
     try {
-      let cmd: string
+      let ps: string
       switch (action) {
         case 'start':
-          cmd = `Start-Service -Name "${safeName}"`
+          ps = `Start-Service -Name '${safeName}'`
           break
         case 'stop':
-          cmd = `Stop-Service -Name "${safeName}" -Force`
+          ps = `Stop-Service -Name '${safeName}' -Force`
           break
         case 'disable':
-          cmd = `Set-Service -Name "${safeName}" -StartupType Disabled`
+          ps = `Set-Service -Name '${safeName}' -StartupType Disabled`
           break
       }
-      await execAsync(`powershell -NoProfile -Command "${cmd}"`, { timeout: 10000 })
+      await runPowerShell(ps, 10000)
       return { success: true }
     } catch (err) {
       log.error('setServiceState error:', err)

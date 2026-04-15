@@ -1,9 +1,6 @@
-import { exec } from 'child_process'
-import { promisify } from 'util'
 import log from 'electron-log'
+import { runPowerShell } from '../utils/powershell'
 import type { SystemMetrics, CpuMetrics, RamMetrics, DiskMetrics, NetworkMetrics } from '../../shared/types'
-
-const execAsync = promisify(exec)
 
 const HISTORY_SIZE = 60 // Keep last 60 data points
 
@@ -11,7 +8,6 @@ export class SystemMonitor {
   private intervalId: NodeJS.Timer | null = null
   private cpuHistory: number[] = []
   private ramHistory: number[] = []
-  private lastNetworkBytes = { rx: 0, tx: 0, ts: 0 }
 
   /** Start continuous monitoring, calling `callback` every `intervalMs`. */
   start(callback: (metrics: SystemMetrics) => void, intervalMs = 3000): void {
@@ -78,8 +74,8 @@ export class SystemMonitor {
           LoadPercentage = [int]$load
         } | ConvertTo-Json
       `
-      const { stdout } = await execAsync(`powershell -NoProfile -Command "${ps.replace(/"/g, '\\"')}"`)
-      const data = JSON.parse(stdout.trim())
+      const stdout = await runPowerShell(ps)
+      const data = JSON.parse(stdout)
       return {
         usagePercent: data.LoadPercentage ?? 0,
         coreCount: data.NumberOfCores ?? 1,
@@ -106,8 +102,8 @@ export class SystemMonitor {
           FreePhysicalMemory = $os.FreePhysicalMemory
         } | ConvertTo-Json
       `
-      const { stdout } = await execAsync(`powershell -NoProfile -Command "${ps.replace(/"/g, '\\"')}"`)
-      const data = JSON.parse(stdout.trim())
+      const stdout = await runPowerShell(ps)
+      const data = JSON.parse(stdout)
       const totalMB = Math.round(data.TotalVisibleMemorySize / 1024)
       const freeMB = Math.round(data.FreePhysicalMemory / 1024)
       const usedMB = totalMB - freeMB
@@ -134,16 +130,16 @@ export class SystemMonitor {
         Select-Object DeviceID, VolumeName, Size, FreeSpace |
         ConvertTo-Json
       `
-      const { stdout } = await execAsync(`powershell -NoProfile -Command "${ps.replace(/"/g, '\\"')}"`)
-      const raw = JSON.parse(stdout.trim())
+      const stdout = await runPowerShell(ps)
+      const raw = JSON.parse(stdout)
       const items = Array.isArray(raw) ? raw : [raw]
-      return items.map((d) => {
-        const totalGB = d.Size / (1024 ** 3)
-        const freeGB = d.FreeSpace / (1024 ** 3)
+      return items.map((d: Record<string, unknown>) => {
+        const totalGB = Number(d.Size) / (1024 ** 3)
+        const freeGB = Number(d.FreeSpace) / (1024 ** 3)
         const usedGB = totalGB - freeGB
         return {
-          drive: d.DeviceID,
-          label: d.VolumeName || d.DeviceID,
+          drive: String(d.DeviceID ?? ''),
+          label: String(d.VolumeName || d.DeviceID),
           totalGB: Math.round(totalGB * 10) / 10,
           usedGB: Math.round(usedGB * 10) / 10,
           freeGB: Math.round(freeGB * 10) / 10,

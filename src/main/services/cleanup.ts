@@ -1,12 +1,9 @@
-import { exec } from 'child_process'
-import { promisify } from 'util'
 import * as fs from 'fs'
 import * as path from 'path'
 import log from 'electron-log'
-import { PROTECTED_PATHS, isPathSafe } from '../utils/security'
+import { runPowerShell } from '../utils/powershell'
+import { isPathSafe } from '../utils/security'
 import type { CleanupCategory, CleanupResult } from '../../shared/types'
-
-const execAsync = promisify(exec)
 
 export const CLEANUP_CATEGORIES: Omit<CleanupCategory, 'sizeMB' | 'fileCount'>[] = [
   {
@@ -127,13 +124,11 @@ export class CleanupService {
 
     if (cat.id === 'recycle_bin') {
       try {
-        await execAsync('powershell -NoProfile -Command "Clear-RecycleBin -Force -ErrorAction SilentlyContinue"')
-        freedMB = 0
-        deletedFiles = 0
+        await runPowerShell('Clear-RecycleBin -Force -ErrorAction SilentlyContinue')
       } catch (err) {
         errors.push(String(err))
       }
-      return { categoryId: cat.id, freedMB, deletedFiles, errors, success: errors.length === 0 }
+      return { categoryId: cat.id, freedMB: 0, deletedFiles: 0, errors, success: errors.length === 0 }
     }
 
     for (const rawPath of cat.paths) {
@@ -164,26 +159,26 @@ export class CleanupService {
 
   private async deleteContents(dirPath: string): Promise<void> {
     if (!fs.existsSync(dirPath)) return
+    // Use single-quoted path inside the script — no user input, expandPath is our own logic
+    const safePath = dirPath.replace(/'/g, "''")
     const ps = `
-      Get-ChildItem -Path "${dirPath}" -Force -ErrorAction SilentlyContinue |
+      Get-ChildItem -Path '${safePath}' -Force -ErrorAction SilentlyContinue |
       Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
     `
-    await execAsync(`powershell -NoProfile -Command "${ps.replace(/"/g, '\\"')}"`, { timeout: 30000 })
+    await runPowerShell(ps, 30000)
   }
 
   private async getDirSize(dirPath: string): Promise<{ sizeMB: number; fileCount: number }> {
     if (!fs.existsSync(dirPath)) return { sizeMB: 0, fileCount: 0 }
+    const safePath = dirPath.replace(/'/g, "''")
     const ps = `
-      $items = Get-ChildItem -Path "${dirPath}" -Recurse -Force -ErrorAction SilentlyContinue
+      $items = Get-ChildItem -Path '${safePath}' -Recurse -Force -ErrorAction SilentlyContinue
       $size = ($items | Measure-Object -Property Length -Sum).Sum
       $count = ($items | Where-Object { !$_.PSIsContainer } | Measure-Object).Count
       [PSCustomObject]@{ Size = [long]($size ?? 0); Count = [int]($count ?? 0) } | ConvertTo-Json
     `
-    const { stdout } = await execAsync(
-      `powershell -NoProfile -Command "${ps.replace(/"/g, '\\"')}"`,
-      { timeout: 15000 }
-    )
-    const data = JSON.parse(stdout.trim())
+    const stdout = await runPowerShell(ps, 15000)
+    const data = JSON.parse(stdout)
     return {
       sizeMB: Math.round((Number(data.Size ?? 0) / (1024 * 1024)) * 10) / 10,
       fileCount: Number(data.Count ?? 0)
@@ -199,11 +194,8 @@ export class CleanupService {
         foreach ($item in $bin.Items()) { $size += $item.Size; $count++ }
         [PSCustomObject]@{ Size = $size; Count = $count } | ConvertTo-Json
       `
-      const { stdout } = await execAsync(
-        `powershell -NoProfile -Command "${ps.replace(/"/g, '\\"')}"`,
-        { timeout: 10000 }
-      )
-      const data = JSON.parse(stdout.trim())
+      const stdout = await runPowerShell(ps, 10000)
+      const data = JSON.parse(stdout)
       return {
         sizeMB: Math.round((Number(data.Size ?? 0) / (1024 * 1024)) * 10) / 10,
         fileCount: Number(data.Count ?? 0)

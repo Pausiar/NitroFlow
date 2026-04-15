@@ -4,6 +4,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import * as os from 'os'
 import log from 'electron-log'
+import { runPowerShell } from '../utils/powershell'
 import { PROTECTED_REGISTRY_KEYS } from '../utils/security'
 import type { RegistryEntry, RegistryCleanResult } from '../../shared/types'
 
@@ -26,7 +27,6 @@ export class RegistryService {
     const entries: RegistryEntry[] = []
     const scanners = [
       this.scanUninstalledSoftware.bind(this),
-      this.scanOrphanedFileAssociations.bind(this),
       this.scanObsoleteStartupEntries.bind(this)
     ]
     for (const scanner of scanners) {
@@ -48,7 +48,6 @@ export class RegistryService {
     const allEntries = await this.scan()
     const toClean = allEntries.filter((e) => entryIds.includes(e.id))
 
-    // Safety: reject any protected keys
     const safe = toClean.filter((e) => !this.isProtectedKey(e.key))
     const blocked = toClean.length - safe.length
 
@@ -56,7 +55,6 @@ export class RegistryService {
       return { fixed: 0, backed_up: false, errors: [`${blocked} entradas están protegidas`] }
     }
 
-    // Create backup before modifying
     const backupPath = await this.createBackup(safe.map((e) => e.key))
     const errors: string[] = []
     let fixed = 0
@@ -70,7 +68,7 @@ export class RegistryService {
       }
     }
 
-    return { fixed, backed_up: !!backupPath, errors, backupPath }
+    return { fixed, backed_up: !!backupPath, errors, backupPath: backupPath ?? undefined }
   }
 
   private async scanUninstalledSoftware(): Promise<RegistryEntry[]> {
@@ -96,12 +94,9 @@ export class RegistryService {
       }
       $orphans | ConvertTo-Json
     `
-    const { stdout } = await execAsync(
-      `powershell -NoProfile -Command "${ps.replace(/"/g, '\\"')}"`,
-      { timeout: 20000 }
-    )
+    const stdout = await runPowerShell(ps, 20000)
     if (!stdout.trim()) return []
-    const raw = JSON.parse(stdout.trim())
+    const raw = JSON.parse(stdout)
     const items = Array.isArray(raw) ? raw : [raw]
     return items.map((item: Record<string, unknown>, i: number) => ({
       id: `uninstall_${i}`,
@@ -112,11 +107,6 @@ export class RegistryService {
       severity: 'Low' as const,
       safe: true
     }))
-  }
-
-  private async scanOrphanedFileAssociations(): Promise<RegistryEntry[]> {
-    // Simplified scan for demonstration
-    return []
   }
 
   private async scanObsoleteStartupEntries(): Promise<RegistryEntry[]> {
@@ -147,12 +137,9 @@ export class RegistryService {
       $orphans | ConvertTo-Json
     `
     try {
-      const { stdout } = await execAsync(
-        `powershell -NoProfile -Command "${ps.replace(/"/g, '\\"')}"`,
-        { timeout: 15000 }
-      )
+      const stdout = await runPowerShell(ps, 15000)
       if (!stdout.trim()) return []
-      const raw = JSON.parse(stdout.trim())
+      const raw = JSON.parse(stdout)
       const items = Array.isArray(raw) ? raw : [raw]
       return items.map((item: Record<string, unknown>, i: number) => ({
         id: `startup_orphan_${i}`,
@@ -169,10 +156,11 @@ export class RegistryService {
   }
 
   private async deleteRegistryValue(key: string, value: string): Promise<void> {
+    // Use single-quoted strings inside PS to avoid injection
     const safeKey = key.replace(/'/g, "''")
     const safeValue = value.replace(/'/g, "''")
     const ps = `Remove-ItemProperty -Path '${safeKey}' -Name '${safeValue}' -ErrorAction Stop`
-    await execAsync(`powershell -NoProfile -Command "${ps}"`, { timeout: 5000 })
+    await runPowerShell(ps, 5000)
   }
 
   private async createBackup(keys: string[]): Promise<string | null> {
