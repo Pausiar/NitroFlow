@@ -79,5 +79,54 @@ describe('OptimizerService', () => {
       expect(result.error).toMatch(/disk full/)
     })
   })
+
+  describe('applyMode (Windows)', () => {
+    let originalPlatform: PropertyDescriptor | undefined
+
+    beforeEach(() => {
+      originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform')
+      Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
+    })
+
+    afterEach(() => {
+      if (originalPlatform) {
+        Object.defineProperty(process, 'platform', originalPlatform)
+      }
+    })
+
+    it('calls PowerShell when applying balanced on Windows', async () => {
+      const result = await service.applyMode('balanced')
+      expect(result.success).toBe(true)
+      expect(mockRunPowerShell).toHaveBeenCalled()
+    })
+
+    it('calls PowerShell when applying performance on Windows', async () => {
+      const result = await service.applyMode('performance')
+      expect(result.success).toBe(true)
+      expect(mockRunPowerShell).toHaveBeenCalled()
+    })
+
+    it('calls PowerShell when applying gaming on Windows', async () => {
+      const result = await service.applyMode('gaming')
+      expect(result.success).toBe(true)
+      expect(mockRunPowerShell).toHaveBeenCalled()
+    })
+
+    it('calls more PowerShell commands for gaming than for performance', async () => {
+      await service.applyMode('performance')
+      const perfCalls = mockRunPowerShell.mock.calls.length
+      mockRunPowerShell.mockClear()
+      await service.applyMode('gaming')
+      const gamingCalls = mockRunPowerShell.mock.calls.length
+      expect(gamingCalls).toBeGreaterThan(perfCalls)
+    })
+
+    it('returns success: false and error when PowerShell rejects', async () => {
+      mockRunPowerShell.mockRejectedValueOnce(new Error('powershell error'))
+      const result = await service.applyMode('balanced')
+      expect(result.success).toBe(false)
+      expect(result.error).toMatch(/powershell error/)
+    })
+  })
 })
 

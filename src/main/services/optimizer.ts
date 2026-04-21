@@ -143,6 +143,8 @@ export class OptimizerService {
     )
 
     // Disable network throttling (removes bandwidth cap on game traffic)
+    // 0xffffffff is the maximum 32-bit unsigned int, which effectively disables
+    // Windows' built-in network throttling index (default is 10 = ~10 Mbps cap).
     await runPowerShell(
       `Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile' -Name NetworkThrottlingIndex -Value 0xffffffff -Type DWord -ErrorAction SilentlyContinue`,
       5000

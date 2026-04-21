@@ -3,6 +3,11 @@ import { useAppStore } from '../../store/app.store'
 import { RefreshCw, X, Search, AlertTriangle, Bot, Loader2, Trash2 } from 'lucide-react'
 import type { ProcessInfo, ServiceInfo, ProcessAIVerdict } from '../../../../shared/types'
 
+/** Returns `singular` when n === 1, otherwise `plural`. */
+function pl(n: number, singular: string, plural: string): string {
+  return n === 1 ? singular : plural
+}
+
 export function Processes() {
   const {
     processes, services, setProcesses, setServices,
@@ -70,7 +75,7 @@ export function Processes() {
         const disposable = result.verdicts.filter((v) => v.verdict === 'disposable').length
         addNotification({
           type: disposable > 0 ? 'warning' : 'success',
-          message: `Análisis IA: ${disposable} proceso${disposable !== 1 ? 's' : ''} prescindible${disposable !== 1 ? 's' : ''} detectado${disposable !== 1 ? 's' : ''}`
+          message: `Análisis IA: ${disposable} ${pl(disposable, 'proceso prescindible', 'procesos prescindibles')} detectado${pl(disposable, '', 's')}`
         })
       }
       if (result?.error) {
@@ -85,7 +90,7 @@ export function Processes() {
     const disposable = processAIVerdicts.filter((v) => v.verdict === 'disposable')
     if (!disposable.length) return
     const confirmed = window.confirm(
-      `¿Terminar ${disposable.length} proceso${disposable.length !== 1 ? 's' : ''} marcado${disposable.length !== 1 ? 's' : ''} como prescindible${disposable.length !== 1 ? 's' : ''}?`
+      `¿Terminar ${disposable.length} ${pl(disposable.length, 'proceso marcado', 'procesos marcados')} como ${pl(disposable.length, 'prescindible', 'prescindibles')}?`
     )
     if (!confirmed) return
 
@@ -95,7 +100,7 @@ export function Processes() {
       if (result?.success) killed++
     }
 
-    addNotification({ type: 'success', message: `${killed} proceso${killed !== 1 ? 's' : ''} terminado${killed !== 1 ? 's' : ''}` })
+    addNotification({ type: 'success', message: `${killed} ${pl(killed, 'proceso terminado', 'procesos terminados')}` })
     setProcessAIVerdicts([])
     refresh()
   }
