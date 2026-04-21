@@ -1,11 +1,10 @@
 node_modules/
 dist/
 out/
+release/
 .cache/
 coverage/
 *.log
 .env
 .env.local
-resources/icon.ico
-resources/icon.png
 *.tsbuildinfo

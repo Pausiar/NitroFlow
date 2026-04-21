@@ -57,6 +57,9 @@
   "build": {
     "appId": "com.nitroflow.app",
     "productName": "NitroFlow",
+    "directories": {
+      "output": "release"
+    },
     "win": {
       "target": ["nsis"],
       "icon": "resources/icon.ico",
