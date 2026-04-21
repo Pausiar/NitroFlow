@@ -2,7 +2,7 @@
   "name": "nitroflow",
   "version": "1.0.0",
   "description": "NitroFlow – Intelligent Windows System Optimizer",
-  "main": "dist/main/index.js",
+  "main": "out/main/index.js",
   "author": "NitroFlow",
   "license": "MIT",
   "private": true,
@@ -69,7 +69,7 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
     },
-    "files": ["dist/**/*"],
+    "files": ["out/**/*"],
     "extraResources": ["resources/**/*"]
   },
   "jest": {
