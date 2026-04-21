@@ -7,6 +7,7 @@ import { Processes } from './Processes/Processes'
 import { Registry } from './Registry/Registry'
 import { Startup } from './Startup/Startup'
 import { AIChat } from './AI/AIChat'
+import { Optimizer } from './Optimizer/Optimizer'
 import { Settings } from './Settings/Settings'
 import { History } from './Layout/History'
 import { NotificationStack } from './Layout/NotificationStack'
@@ -31,6 +32,9 @@ declare global {
       cleanRegistry: (ids: string[]) => Promise<unknown>
       aiChat: (messages: unknown[], context: unknown) => Promise<unknown>
       aiAnalyze: (context: unknown) => Promise<unknown>
+      analyzeProcesses: (processes: unknown[]) => Promise<unknown>
+      getOptimizerStatus: () => Promise<unknown>
+      setOptimizerMode: (mode: string) => Promise<unknown>
       getHistory: () => Promise<unknown>
       undoAction: (id: string) => Promise<unknown>
       getSettings: () => Promise<unknown>
@@ -84,6 +88,7 @@ export function App() {
       {currentPage === 'registry' && <Registry />}
       {currentPage === 'startup' && <Startup />}
       {currentPage === 'ai' && <AIChat />}
+      {currentPage === 'optimizer' && <Optimizer />}
       {currentPage === 'settings' && <Settings />}
       {currentPage === 'history' && <History />}
     </Layout>

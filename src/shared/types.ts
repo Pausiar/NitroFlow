@@ -160,6 +160,21 @@ export type ActionType =
   | 'service'
   | 'settings'
 
+// ─── Optimizer ──────────────────────────────
+export type PerformanceMode = 'balanced' | 'performance' | 'gaming'
+
+export interface OptimizerStatus {
+  currentMode: PerformanceMode
+  appliedAt: number | null
+}
+
+export interface ProcessAIVerdict {
+  pid: number
+  name: string
+  verdict: 'useful' | 'disposable' | 'unknown'
+  reason: string
+}
+
 // ─── Settings ───────────────────────────────
 export interface AppSettings {
   nvidiaApiKey: string
@@ -171,6 +186,7 @@ export interface AppSettings {
   language: 'es' | 'en'
   notifications: boolean
   startWithWindows: boolean
+  performanceMode: PerformanceMode
 }
 
 // ─── IPC Channel Names ───────────────────────
@@ -209,6 +225,13 @@ export const IPC_CHANNELS = {
   // Settings
   GET_SETTINGS: 'settings:get',
   SAVE_SETTINGS: 'settings:save',
+
+  // Optimizer
+  OPTIMIZER_GET_STATUS: 'optimizer:get-status',
+  OPTIMIZER_SET_MODE: 'optimizer:set-mode',
+
+  // Process AI analysis
+  ANALYZE_PROCESSES: 'processes:ai-analyze',
 
   // Events (main → renderer)
   METRICS_UPDATE: 'event:metrics-update',

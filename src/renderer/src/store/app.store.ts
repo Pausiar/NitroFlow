@@ -8,10 +8,12 @@ import type {
   RegistryEntry,
   ChatMessage,
   ActionHistory,
-  AppSettings
+  AppSettings,
+  PerformanceMode,
+  ProcessAIVerdict
 } from '../../../shared/types'
 
-type Page = 'dashboard' | 'cleanup' | 'processes' | 'registry' | 'startup' | 'ai' | 'settings' | 'history'
+type Page = 'dashboard' | 'cleanup' | 'processes' | 'registry' | 'startup' | 'ai' | 'optimizer' | 'settings' | 'history'
 
 interface Notification {
   id: string
@@ -59,6 +61,14 @@ interface AppState {
   settings: AppSettings
   setSettings: (s: AppSettings) => void
 
+  // Optimizer
+  optimizerMode: PerformanceMode
+  setOptimizerMode: (mode: PerformanceMode) => void
+
+  // Process AI verdicts
+  processAIVerdicts: ProcessAIVerdict[]
+  setProcessAIVerdicts: (v: ProcessAIVerdict[]) => void
+
   // UI state
   notifications: Notification[]
   addNotification: (n: Omit<Notification, 'id'>) => void
@@ -105,9 +115,16 @@ export const useAppStore = create<AppState>((set) => ({
     darkMode: true,
     language: 'es',
     notifications: true,
-    startWithWindows: false
+    startWithWindows: false,
+    performanceMode: 'balanced'
   },
   setSettings: (settings) => set({ settings }),
+
+  optimizerMode: 'balanced',
+  setOptimizerMode: (optimizerMode) => set({ optimizerMode }),
+
+  processAIVerdicts: [],
+  setProcessAIVerdicts: (processAIVerdicts) => set({ processAIVerdicts }),
 
   notifications: [],
   addNotification: (n) =>

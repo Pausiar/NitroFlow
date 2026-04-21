@@ -43,6 +43,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke(IPC_CHANNELS.AI_CHAT, { messages, systemContext }),
   aiAnalyze: (systemContext: unknown) =>
     ipcRenderer.invoke(IPC_CHANNELS.AI_ANALYZE, systemContext),
+  analyzeProcesses: (processes: unknown[]) =>
+    ipcRenderer.invoke(IPC_CHANNELS.ANALYZE_PROCESSES, processes),
+
+  // Optimizer
+  getOptimizerStatus: () => ipcRenderer.invoke(IPC_CHANNELS.OPTIMIZER_GET_STATUS),
+  setOptimizerMode: (mode: string) => ipcRenderer.invoke(IPC_CHANNELS.OPTIMIZER_SET_MODE, mode),
 
   // History
   getHistory: () => ipcRenderer.invoke(IPC_CHANNELS.GET_HISTORY),

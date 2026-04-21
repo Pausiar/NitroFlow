@@ -9,6 +9,7 @@ import { StartupManager } from '../services/startup-manager'
 import { AIService } from '../services/ai-service'
 import { HistoryService } from '../services/history'
 import { SettingsService } from '../services/settings'
+import { OptimizerService } from '../services/optimizer'
 
 export function setupIpcHandlers(): void {
   const systemMonitor = new SystemMonitor()
@@ -19,6 +20,7 @@ export function setupIpcHandlers(): void {
   const aiService = new AIService()
   const historyService = HistoryService.getInstance()
   const settingsService = SettingsService.getInstance()
+  const optimizerService = OptimizerService.getInstance()
 
   // ── System Metrics ──────────────────────────────
   ipcMain.handle(IPC_CHANNELS.GET_METRICS, async () => {
@@ -194,6 +196,46 @@ export function setupIpcHandlers(): void {
     } catch (err) {
       log.error('AI_ANALYZE error:', err)
       return { error: String(err) }
+    }
+  })
+
+  ipcMain.handle(IPC_CHANNELS.ANALYZE_PROCESSES, async (_, processes) => {
+    try {
+      const settings = settingsService.get()
+      return await aiService.analyzeProcesses(processes, settings.nvidiaApiKey, settings.aiModel)
+    } catch (err) {
+      log.error('ANALYZE_PROCESSES error:', err)
+      return { verdicts: [], error: String(err) }
+    }
+  })
+
+  // ── Optimizer ────────────────────────────────────
+  ipcMain.handle(IPC_CHANNELS.OPTIMIZER_GET_STATUS, () => {
+    return optimizerService.getStatus()
+  })
+
+  ipcMain.handle(IPC_CHANNELS.OPTIMIZER_SET_MODE, async (_, mode) => {
+    try {
+      const result = await optimizerService.applyMode(mode)
+      if (result.success) {
+        historyService.record({
+          type: 'settings',
+          description: `Modo de rendimiento: ${mode}`,
+          details: `Se activó el modo "${mode}" en el optimizador de rendimiento`,
+          reversible: true
+        })
+        const windows = BrowserWindow.getAllWindows()
+        windows.forEach((w) =>
+          w.webContents.send(IPC_CHANNELS.NOTIFICATION, {
+            type: 'success',
+            message: `Modo "${mode}" activado correctamente`
+          })
+        )
+      }
+      return result
+    } catch (err) {
+      log.error('OPTIMIZER_SET_MODE error:', err)
+      return { success: false, error: String(err) }
     }
   })
 
