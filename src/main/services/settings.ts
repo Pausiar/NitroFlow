@@ -13,7 +13,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   darkMode: true,
   language: 'es',
   notifications: true,
-  startWithWindows: false
+  startWithWindows: false,
+  performanceMode: 'balanced'
 }
 
 export class SettingsService {

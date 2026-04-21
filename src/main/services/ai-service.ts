@@ -1,6 +1,6 @@
 import axios from 'axios'
 import log from 'electron-log'
-import type { ChatMessage, SystemContext } from '../../shared/types'
+import type { ChatMessage, SystemContext, ProcessInfo, ProcessAIVerdict } from '../../shared/types'
 
 const NVIDIA_NIM_BASE_URL = 'https://integrate.api.nvidia.com/v1'
 const DEFAULT_MODEL = 'meta/llama3-8b-instruct'
@@ -95,6 +95,132 @@ export class AIService {
       log.error('AI analyze error:', err)
       return this.getOfflineAnalysis(systemContext)
     }
+  }
+
+  async analyzeProcesses(
+    processes: ProcessInfo[],
+    apiKey: string,
+    model = DEFAULT_MODEL
+  ): Promise<{ verdicts: ProcessAIVerdict[]; error?: string }> {
+    // Limit to the top 30 by resource usage to keep the prompt concise
+    const top = processes
+      .filter((p) => p.canTerminate)
+      .sort((a, b) => b.cpuPercent + b.ramMB / 100 - (a.cpuPercent + a.ramMB / 100))
+      .slice(0, 30)
+
+    if (!apiKey) {
+      return { verdicts: this.getOfflineProcessVerdicts(top) }
+    }
+
+    const processList = top
+      .map(
+        (p) =>
+          `- PID ${p.pid}: "${p.name}" (${p.description || 'sin descripción'}) | CPU: ${p.cpuPercent}% | RAM: ${p.ramMB} MB`
+      )
+      .join('\n')
+
+    const prompt = `Eres un experto en sistemas Windows. Analiza estos procesos en ejecución y clasifica cada uno como "useful" (útil para el sistema o el usuario) o "disposable" (prescindible, se puede terminar sin riesgos). Responde SIEMPRE en JSON.
+
+Procesos:
+${processList}
+
+Responde EXACTAMENTE con este formato JSON (sin texto extra):
+[
+  { "pid": <number>, "name": "<string>", "verdict": "useful"|"disposable", "reason": "<breve razón en español>" },
+  ...
+]`
+
+    try {
+      const response = await axios.post(
+        `${NVIDIA_NIM_BASE_URL}/chat/completions`,
+        {
+          model,
+          messages: [
+            {
+              role: 'system',
+              content:
+                'Eres un experto en optimización de sistemas Windows. Responde SIEMPRE en JSON válido.'
+            },
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0.2,
+          max_tokens: 2048,
+          stream: false
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 45000
+        }
+      )
+
+      const raw = response.data?.choices?.[0]?.message?.content ?? ''
+      const verdicts = this.parseProcessVerdicts(raw, top)
+      return { verdicts }
+    } catch (err) {
+      log.error('AI analyzeProcesses error:', err)
+      return {
+        verdicts: this.getOfflineProcessVerdicts(top),
+        error: axios.isAxiosError(err) ? err.message : String(err)
+      }
+    }
+  }
+
+  private parseProcessVerdicts(raw: string, processes: ProcessInfo[]): ProcessAIVerdict[] {
+    try {
+      const jsonMatch = raw.match(/\[[\s\S]*\]/)
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]) as ProcessAIVerdict[]
+        if (Array.isArray(parsed)) {
+          return parsed.map((v) => ({
+            pid: Number(v.pid),
+            name: String(v.name ?? ''),
+            verdict: v.verdict === 'disposable' ? 'disposable' : 'useful',
+            reason: String(v.reason ?? '')
+          }))
+        }
+      }
+    } catch {
+      // Fall through to offline
+    }
+    return this.getOfflineProcessVerdicts(processes)
+  }
+
+  private getOfflineProcessVerdicts(processes: ProcessInfo[]): ProcessAIVerdict[] {
+    // Known disposable process name patterns (common background fluff)
+    const disposablePatterns = [
+      /update/i,
+      /telemetry/i,
+      /crash.*report/i,
+      /report.*crash/i,
+      /helper/i,
+      /notif/i,
+      /tray/i,
+      /agent/i,
+      /toolbar/i,
+      /browser.*helper/i,
+      /discord.*update/i,
+      /skype.*update/i,
+      /onedrive/i,
+      /dropbox/i,
+      /googledrivesync/i,
+      /teamviewer/i,
+      /anydesk/i,
+    ]
+
+    return processes.map((p) => {
+      const isDisposable = disposablePatterns.some((re) => re.test(p.name) || re.test(p.description))
+      return {
+        pid: p.pid,
+        name: p.name,
+        verdict: isDisposable ? 'disposable' : 'unknown',
+        reason: isDisposable
+          ? 'Proceso de fondo identificado como prescindible (modo offline)'
+          : 'Configura la API key de NVIDIA NIM para un análisis preciso'
+      }
+    })
   }
 
   private buildSystemPrompt(ctx: SystemContext): string {

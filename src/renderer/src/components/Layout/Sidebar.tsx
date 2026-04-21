@@ -6,6 +6,7 @@ import {
   Database,
   Rocket,
   Bot,
+  Zap,
   Settings,
   Clock
 } from 'lucide-react'
@@ -16,6 +17,7 @@ const navItems = [
   { id: 'processes', label: 'Procesos', icon: Cpu },
   { id: 'registry', label: 'Registro', icon: Database },
   { id: 'startup', label: 'Inicio', icon: Rocket },
+  { id: 'optimizer', label: 'Rendimiento', icon: Zap },
   { id: 'ai', label: 'Asistente IA', icon: Bot },
 ] as const
 
