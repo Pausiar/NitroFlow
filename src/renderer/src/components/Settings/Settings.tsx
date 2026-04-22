@@ -4,10 +4,10 @@ import { Save, Eye, EyeOff, Info } from 'lucide-react'
 import type { AppSettings } from '../../../../shared/types'
 
 const AI_MODELS = [
-  { value: 'meta/llama3-8b-instruct', label: 'Meta Llama 3 8B Instruct' },
-  { value: 'meta/llama3-70b-instruct', label: 'Meta Llama 3 70B Instruct' },
-  { value: 'mistralai/mistral-7b-instruct', label: 'Mistral 7B Instruct' },
-  { value: 'nvidia/nemotron-4-340b-instruct', label: 'NVIDIA Nemotron-4 340B' },
+  { value: 'meta/llama-3.1-8b-instruct', label: 'Meta Llama 3.1 8B Instruct' },
+  { value: 'meta/llama-3.1-70b-instruct', label: 'Meta Llama 3.1 70B Instruct' },
+  { value: 'mistral/mistral-7b-instruct-v0.3', label: 'Mistral 7B Instruct v0.3' },
+  { value: 'nvidia/llama-3.1-nemotron-70b-instruct', label: 'NVIDIA Llama 3.1 Nemotron 70B' },
 ]
 
 export function Settings() {
@@ -187,12 +187,12 @@ function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: (v: b
   return (
     <button
       onClick={() => onChange(!checked)}
-      className={`relative w-10 h-6 rounded-full transition-colors duration-200 ${
+      className={`relative w-10 h-6 rounded-full transition-colors duration-200 overflow-hidden ${
         checked ? 'bg-fluent-accent' : 'bg-fluent-border'
       }`}
     >
       <span
-        className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${
+        className={`absolute top-1 left-0 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${
           checked ? 'translate-x-5' : 'translate-x-1'
         }`}
       />

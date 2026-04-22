@@ -173,9 +173,11 @@ export class CleanupService {
     const safePath = dirPath.replace(/'/g, "''")
     const ps = `
       $items = Get-ChildItem -Path '${safePath}' -Recurse -Force -ErrorAction SilentlyContinue
-      $size = ($items | Measure-Object -Property Length -Sum).Sum
-      $count = ($items | Where-Object { !$_.PSIsContainer } | Measure-Object).Count
-      [PSCustomObject]@{ Size = [long]($size ?? 0); Count = [int]($count ?? 0) } | ConvertTo-Json
+      $sizeRaw = ($items | Measure-Object -Property Length -Sum).Sum
+      $countRaw = ($items | Where-Object { !$_.PSIsContainer } | Measure-Object).Count
+      $size = if ($sizeRaw -ne $null) { [long]$sizeRaw } else { 0L }
+      $count = if ($countRaw -ne $null) { [int]$countRaw } else { 0 }
+      [PSCustomObject]@{ Size = $size; Count = $count } | ConvertTo-Json
     `
     const stdout = await runPowerShell(ps, 15000)
     const data = JSON.parse(stdout)

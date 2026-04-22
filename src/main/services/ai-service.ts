@@ -3,7 +3,7 @@ import log from 'electron-log'
 import type { ChatMessage, SystemContext, ProcessInfo, ProcessAIVerdict } from '../../shared/types'
 
 const NVIDIA_NIM_BASE_URL = 'https://integrate.api.nvidia.com/v1'
-const DEFAULT_MODEL = 'meta/llama3-8b-instruct'
+const DEFAULT_MODEL = 'meta/llama-3.1-8b-instruct'
 
 export class AIService {
   async chat(

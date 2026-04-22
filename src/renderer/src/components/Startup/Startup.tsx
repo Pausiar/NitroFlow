@@ -137,12 +137,12 @@ export function Startup() {
               {/* Toggle switch */}
               <button
                 onClick={() => handleToggle(entry.id, !entry.enabled)}
-                className={`relative w-10 h-6 rounded-full transition-colors duration-200 ${
+                className={`relative w-10 h-6 rounded-full transition-colors duration-200 overflow-hidden ${
                   entry.enabled ? 'bg-fluent-accent' : 'bg-fluent-border'
                 }`}
               >
                 <span
-                  className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${
+                  className={`absolute top-1 left-0 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${
                     entry.enabled ? 'translate-x-5' : 'translate-x-1'
                   }`}
                 />
