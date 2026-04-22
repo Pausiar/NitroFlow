@@ -4,6 +4,16 @@ import { createClient } from "@/lib/supabase-server";
 import { createServiceClient } from "@/lib/supabase-service";
 import { analyzeTicketWithNim } from "@/lib/nim";
 
+const isLikelyTestTicket = (subject: string, message: string) => {
+  const text = `${subject} ${message}`.toLowerCase();
+  return /(\btest\b|\bprueba\b|testing|hola|asd)/.test(text);
+};
+
+const hasMeaningfulSummary = (summary: string) => {
+  const normalized = summary.trim().toLowerCase();
+  return normalized.length > 25 && normalized !== "sin analisis ia disponible.";
+};
+
 const schema = z.object({
   subject: z.string().min(4).max(120),
   message: z.string().min(10).max(5000)
@@ -108,7 +118,12 @@ export async function POST(request: Request) {
       })
       .eq("id", ticket.id);
 
-    if (aiGenerated) {
+    const shouldAlertAdmin =
+      aiGenerated &&
+      hasMeaningfulSummary(analysis.adminSummary) &&
+      !isLikelyTestTicket(payload.data.subject, payload.data.message);
+
+    if (shouldAlertAdmin) {
       await adminClient.from("admin_alerts").insert({
         ticket_id: ticket.id,
         title: `Posible fallo detectado: ${payload.data.subject}`,
