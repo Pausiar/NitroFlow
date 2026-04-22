@@ -1,0 +1,10 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="nf-grad" x1="0" y1="0" x2="256" y2="256" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#64D2FF" />
+      <stop offset="1" stop-color="#0078D4" />
+    </linearGradient>
+  </defs>
+  <rect x="16" y="16" width="224" height="224" rx="64" fill="url(#nf-grad)" />
+  <path d="M80 180L116 76H140L104 180H80ZM128 180L164 76H188L152 180H128Z" fill="#FFFFFF" />
+</svg>

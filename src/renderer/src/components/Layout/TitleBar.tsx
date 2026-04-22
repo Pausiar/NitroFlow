@@ -1,3 +1,5 @@
+import { BrandLogo } from './BrandLogo'
+
 export function TitleBar() {
   const handleMinimize = () => window.electronAPI?.minimize()
   const handleMaximize = () => window.electronAPI?.maximize()
@@ -6,10 +8,7 @@ export function TitleBar() {
   return (
     <div className="titlebar-drag flex items-center justify-between h-10 bg-fluent-bg border-b border-fluent-border px-4 flex-shrink-0 select-none">
       <div className="flex items-center gap-2">
-        <div className="w-5 h-5 rounded-full bg-fluent-accent flex items-center justify-center">
-          <span className="text-white text-xs font-bold">N</span>
-        </div>
-        <span className="text-sm font-semibold text-fluent-text">NitroFlow</span>
+        <BrandLogo size={20} />
         <span className="text-xs text-fluent-textMuted ml-1">v1.0.0</span>
       </div>
 

@@ -10,6 +10,7 @@ import {
   Settings,
   Clock
 } from 'lucide-react'
+import { BrandLogo } from './BrandLogo'
 
 const navItems = [
   { id: 'dashboard', label: 'Panel', icon: LayoutDashboard },
@@ -63,6 +64,11 @@ export function Sidebar() {
             {label}
           </button>
         ))}
+
+        <div className="mt-3 px-3 py-2 rounded-fluent bg-fluent-card border border-fluent-border">
+          <BrandLogo size={18} compact />
+          <p className="mt-1 text-[11px] text-fluent-textMuted">Desktop experience</p>
+        </div>
       </div>
     </aside>
   )
