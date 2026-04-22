@@ -12,11 +12,13 @@ export async function runPowerShell(
   script: string,
   timeoutMs = 15000
 ): Promise<string> {
+  // Force UTF-8 output so accented characters are not garbled
+  const fullScript = `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8\n${script}`
   // PowerShell -EncodedCommand requires UTF-16LE base64
-  const encoded = Buffer.from(script, 'utf16le').toString('base64')
+  const encoded = Buffer.from(fullScript, 'utf16le').toString('base64')
   const { stdout } = await execAsync(
     `powershell -NoProfile -NonInteractive -EncodedCommand ${encoded}`,
-    { timeout: timeoutMs }
+    { timeout: timeoutMs, encoding: 'utf8' }
   )
   return stdout.trim()
 }
