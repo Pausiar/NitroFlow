@@ -82,6 +82,8 @@ export async function POST(request: Request) {
       "Hemos recibido tu ticket y un agente humano lo revisara en breve.",
     adminSummary: "Sin analisis IA disponible."
   };
+  let aiGenerated = false;
+  let aiErrorMessage: string | null = null;
   try {
     analysis = await analyzeTicketWithNim({
       subject: payload.data.subject,
@@ -89,7 +91,9 @@ export async function POST(request: Request) {
       projectContext:
         "NitroFlow desktop (Electron) + NitroFlow web (Next.js, Supabase, Stripe)."
     });
-  } catch {
+    aiGenerated = true;
+  } catch (err) {
+    aiErrorMessage = err instanceof Error ? err.message : "NIM unavailable";
     // mantenemos respuesta por defecto si falla NIM
   }
 
@@ -100,15 +104,23 @@ export async function POST(request: Request) {
       .update({
         ai_response: analysis.userResponse,
         ai_error_summary: analysis.adminSummary,
-        status: "answered"
+        status: aiGenerated ? "answered" : "open"
       })
       .eq("id", ticket.id);
 
-    await adminClient.from("admin_alerts").insert({
-      ticket_id: ticket.id,
-      title: `Posible fallo detectado: ${payload.data.subject}`,
-      message: analysis.adminSummary
-    });
+    if (aiGenerated) {
+      await adminClient.from("admin_alerts").insert({
+        ticket_id: ticket.id,
+        title: `Posible fallo detectado: ${payload.data.subject}`,
+        message: analysis.adminSummary
+      });
+    } else if (aiErrorMessage) {
+      await adminClient.from("admin_alerts").insert({
+        ticket_id: ticket.id,
+        title: "NIM no disponible o lento",
+        message: `No se pudo procesar IA para el ticket ${ticket.id}: ${aiErrorMessage}`
+      });
+    }
   } catch {
     // si falta service key, el ticket existe y la IA respondio igualmente al usuario
   }
