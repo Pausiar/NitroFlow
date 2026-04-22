@@ -290,7 +290,7 @@ export function AdminPanel() {
                     <div className="min-w-0">
                       <p className="truncate font-semibold text-white">{t.subject}</p>
                       <p className="text-xs text-[var(--color-text-dim)]">
-                        {new Date(t.created_at).toLocaleString()} - usuario {t.user_id.slice(0, 8)}
+                        {new Date(t.created_at).toLocaleString()} - usuario {(t.user_id || "desconocido").slice(0, 8)}
                       </p>
                     </div>
                     <span className="rounded-full bg-[var(--color-surface)] px-2 py-0.5 text-xs uppercase text-[var(--color-text-muted)]">
