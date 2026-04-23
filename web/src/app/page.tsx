@@ -161,7 +161,7 @@ export default function HomePage() {
                   </div>
                   <div className="col-span-9 space-y-4 p-6">
                     <div>
-                      <h3 className="text-lg font-semibold text-white">Panel de rendimiento</h3>
+                      <p className="text-lg font-semibold text-white">Panel de rendimiento</p>
                       <p className="text-xs text-[var(--color-text-muted)]">
                         Estado del sistema en tiempo real
                         <span className="live-dot ml-2 inline-block h-2 w-2 rounded-full bg-[var(--color-success)]" />
@@ -296,7 +296,7 @@ export default function HomePage() {
             </div>
             <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-card)] p-6 shadow-[var(--shadow-fluent-lg)]">
               <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-white">Asistente IA</h3>
+                <p className="font-semibold text-white">Asistente IA</p>
                 <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-accent-soft)] px-2 py-0.5 text-[10px] uppercase tracking-wide text-[var(--color-info)]">
                   <Bot size={10} /> NIM
                 </span>
@@ -333,9 +333,9 @@ export default function HomePage() {
 
           <div className="mt-12 grid gap-6 lg:grid-cols-2">
             <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-card)] p-8">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-dim)]">
+              <p className="text-sm font-semibold uppercase tracking-wide text-[var(--color-text-dim)]">
                 Free
-              </h3>
+              </p>
               <div className="mt-3 flex items-baseline gap-1">
                 <span className="text-5xl font-bold text-white">0$</span>
                 <span className="text-[var(--color-text-muted)]">/ siempre</span>
@@ -368,9 +368,9 @@ export default function HomePage() {
               <div className="absolute right-4 top-4 rounded-full bg-[var(--color-accent)] px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
                 Recomendado
               </div>
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-info)]">
+              <p className="text-sm font-semibold uppercase tracking-wide text-[var(--color-info)]">
                 Pro
-              </h3>
+              </p>
               <div className="mt-3 flex items-baseline gap-1">
                 <span className="text-5xl font-bold text-white">9.99$</span>
                 <span className="text-[var(--color-text-muted)]">/ mes</span>
@@ -450,9 +450,9 @@ Content-Type: application/json
 
         <section className="mx-auto max-w-7xl px-4 pb-24 sm:px-6">
           <div className="overflow-hidden rounded-3xl border border-[var(--color-border)] bg-gradient-to-br from-[#0d2b46] via-[#0c1620] to-[var(--color-card)] p-10 text-center shadow-[var(--shadow-fluent-lg)]">
-            <h3 className="text-2xl font-bold text-white sm:text-3xl">
+            <p className="text-2xl font-bold text-white sm:text-3xl">
               Listo para acelerar tu PC?
-            </h3>
+            </p>
             <p className="mx-auto mt-3 max-w-xl text-[var(--color-text-muted)]">
               Crea tu cuenta gratis y prueba el asistente IA. Sube a Pro cuando lo necesites.
             </p>

@@ -270,9 +270,9 @@ export function AdminPanel() {
               onSubmit={createPromo}
               className="rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-4"
             >
-              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
+              <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
                 <Plus size={14} /> Nuevo codigo promocional
-              </h3>
+              </p>
               <div className="grid gap-3 sm:grid-cols-4">
                 <input
                   value={code}
