@@ -61,7 +61,7 @@ export default async function AdminPage() {
   return (
     <>
       <SiteHeader />
-      <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
+      <main className="mx-auto min-h-[70vh] max-w-7xl px-4 py-10 sm:px-6">
         <div className="mb-6 flex items-center gap-3">
           <span className="grid h-10 w-10 place-items-center rounded-lg bg-[var(--color-warning)]/15 text-[var(--color-warning)]">
             <ShieldCheck size={20} />

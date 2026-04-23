@@ -24,7 +24,7 @@ export function SiteFooter() {
         </div>
 
         <div>
-          <h4 className="text-sm font-semibold text-white">Producto</h4>
+          <h2 className="text-sm font-semibold text-white">Producto</h2>
           <ul className="mt-3 space-y-2 text-sm text-[var(--color-text-muted)]">
             <li><Link href="/#features" className="hover:text-white">Caracteristicas</Link></li>
             <li><Link href="/#pricing" className="hover:text-white">Precios</Link></li>
@@ -33,7 +33,7 @@ export function SiteFooter() {
         </div>
 
         <div>
-          <h4 className="text-sm font-semibold text-white">Cuenta</h4>
+          <h2 className="text-sm font-semibold text-white">Cuenta</h2>
           <ul className="mt-3 space-y-2 text-sm text-[var(--color-text-muted)]">
             <li><Link href="/auth/login" className="hover:text-white">Iniciar sesion</Link></li>
             <li><Link href="/dashboard" className="hover:text-white">Mi panel</Link></li>
