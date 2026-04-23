@@ -29,7 +29,9 @@ export async function GET() {
   const supabase = createServiceClient();
   const { data } = await supabase
     .from("tickets")
-    .select("id, user_id, subject, message, status, ai_response, ai_error_summary, created_at")
+    .select(
+      "id, user_id, subject, message, status, ai_enabled, claimed_by, claimed_at, ai_response, ai_error_summary, created_at"
+    )
     .order("created_at", { ascending: false });
 
   return NextResponse.json({ tickets: data || [] });

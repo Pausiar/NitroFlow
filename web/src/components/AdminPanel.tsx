@@ -4,12 +4,15 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   AlertTriangle,
+  Bot,
   CheckCircle2,
+  Headset,
   Loader2,
   Plus,
   Tag,
   Ticket as TicketIcon,
   Trash2,
+  User,
   Users
 } from "lucide-react";
 
@@ -27,10 +30,21 @@ type Ticket = {
   subject: string;
   message: string;
   status: string;
+  ai_enabled: boolean;
+  claimed_by: string | null;
+  claimed_at: string | null;
   ai_response: string | null;
   ai_error_summary: string | null;
   created_at: string;
   user_id: string;
+};
+
+type TicketMessage = {
+  id: string;
+  sender: "user" | "ai" | "admin";
+  sender_user_id: string | null;
+  body: string;
+  created_at: string;
 };
 
 type Alert = {
@@ -49,6 +63,10 @@ export function AdminPanel() {
   const [promos, setPromos] = useState<Promo[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [messagesByTicket, setMessagesByTicket] = useState<Record<string, TicketMessage[]>>({});
+  const [replyByTicket, setReplyByTicket] = useState<Record<string, string>>({});
+  const [sendingByTicket, setSendingByTicket] = useState<Record<string, boolean>>({});
+  const [claimingByTicket, setClaimingByTicket] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
 
   const [code, setCode] = useState("");
@@ -76,6 +94,67 @@ export function AdminPanel() {
   useEffect(() => {
     fetchAll();
   }, []);
+
+  const fetchTicketMessages = async (ticketId: string) => {
+    try {
+      const res = await fetch(`/api/tickets/${ticketId}/messages`, { cache: "no-store" });
+      const body = await res.json();
+      if (!res.ok) {
+        toast.error(body.error || "Error cargando mensajes");
+        return;
+      }
+      setMessagesByTicket((prev) => ({ ...prev, [ticketId]: body.messages || [] }));
+    } catch {
+      toast.error("Error de red cargando chat del ticket");
+    }
+  };
+
+  const claimTicket = async (ticketId: string) => {
+    setClaimingByTicket((prev) => ({ ...prev, [ticketId]: true }));
+    try {
+      const res = await fetch(`/api/admin/tickets/${ticketId}/claim`, { method: "POST" });
+      const body = await res.json();
+      if (!res.ok) {
+        toast.error(body.error || "No se pudo tomar el ticket");
+        return;
+      }
+      toast.success("Ticket tomado por soporte. IA desactivada en este ticket.");
+      await fetchAll();
+      await fetchTicketMessages(ticketId);
+    } catch {
+      toast.error("Error de red");
+    } finally {
+      setClaimingByTicket((prev) => ({ ...prev, [ticketId]: false }));
+    }
+  };
+
+  const sendAdminReply = async (ticketId: string, e: React.FormEvent) => {
+    e.preventDefault();
+    const message = (replyByTicket[ticketId] || "").trim();
+    if (!message) return;
+
+    setSendingByTicket((prev) => ({ ...prev, [ticketId]: true }));
+    try {
+      const res = await fetch(`/api/tickets/${ticketId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message })
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        toast.error(body.error || "No se pudo enviar la respuesta");
+        return;
+      }
+
+      setReplyByTicket((prev) => ({ ...prev, [ticketId]: "" }));
+      await fetchAll();
+      await fetchTicketMessages(ticketId);
+    } catch {
+      toast.error("Error de red");
+    } finally {
+      setSendingByTicket((prev) => ({ ...prev, [ticketId]: false }));
+    }
+  };
 
   const createPromo = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -284,6 +363,12 @@ export function AdminPanel() {
               tickets.map((t) => (
                 <details
                   key={t.id}
+                  onToggle={(ev) => {
+                    const open = (ev.currentTarget as HTMLDetailsElement).open;
+                    if (open && !messagesByTicket[t.id]) {
+                      fetchTicketMessages(t.id);
+                    }
+                  }}
                   className="rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-4"
                 >
                   <summary className="flex cursor-pointer items-center justify-between gap-3">
@@ -299,8 +384,79 @@ export function AdminPanel() {
                   </summary>
                   <div className="mt-3 space-y-3 text-sm">
                     <div>
-                      <p className="text-xs text-[var(--color-text-dim)]">Mensaje</p>
-                      <p className="whitespace-pre-wrap text-white">{t.message}</p>
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <p className="text-xs text-[var(--color-text-dim)]">Conversacion</p>
+                        {!t.ai_enabled ? (
+                          <span className="rounded-full bg-[var(--color-success)]/15 px-2 py-0.5 text-[10px] text-[var(--color-success)]">
+                            Tomado por soporte humano
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={!!claimingByTicket[t.id]}
+                            onClick={() => claimTicket(t.id)}
+                            className="rounded-md border border-[var(--color-warning)]/50 px-2 py-1 text-[10px] text-[var(--color-warning)] hover:bg-[var(--color-warning)]/10 disabled:opacity-60"
+                          >
+                            {claimingByTicket[t.id] ? "Tomando..." : "Tomar ticket"}
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        {(messagesByTicket[t.id] || []).map((m) => {
+                          const isAI = m.sender === "ai";
+                          const isAdmin = m.sender === "admin";
+                          return (
+                            <div
+                              key={m.id}
+                              className={`flex items-start gap-2 rounded-md border px-3 py-2 ${
+                                isAI
+                                  ? "border-[var(--color-info)]/35 bg-[var(--color-info)]/10"
+                                  : isAdmin
+                                  ? "border-[var(--color-success)]/35 bg-[var(--color-success)]/10"
+                                  : "border-[var(--color-border)] bg-[var(--color-surface)]"
+                              }`}
+                            >
+                              <span className="mt-0.5 text-white">
+                                {isAI ? (
+                                  <Bot size={14} />
+                                ) : isAdmin ? (
+                                  <Headset size={14} />
+                                ) : (
+                                  <User size={14} />
+                                )}
+                              </span>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-[10px] text-[var(--color-text-dim)]">
+                                  {isAI ? "NitroBot" : isAdmin ? "Soporte" : "Usuario"}
+                                </p>
+                                <p className="whitespace-pre-wrap text-white">{m.body}</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {messagesByTicket[t.id] && messagesByTicket[t.id].length === 0 ? (
+                          <p className="text-xs text-[var(--color-text-muted)]">Sin mensajes.</p>
+                        ) : null}
+                      </div>
+
+                      <form onSubmit={(e) => sendAdminReply(t.id, e)} className="mt-3 flex gap-2">
+                        <input
+                          value={replyByTicket[t.id] || ""}
+                          onChange={(e) =>
+                            setReplyByTicket((prev) => ({ ...prev, [t.id]: e.target.value }))
+                          }
+                          placeholder="Responder como soporte..."
+                          className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white"
+                        />
+                        <button
+                          type="submit"
+                          disabled={!!sendingByTicket[t.id]}
+                          className="rounded-md bg-[var(--color-accent)] px-3 py-2 text-sm text-white disabled:opacity-60"
+                        >
+                          {sendingByTicket[t.id] ? "Enviando..." : "Enviar"}
+                        </button>
+                      </form>
                     </div>
                     {t.ai_response ? (
                       <div>

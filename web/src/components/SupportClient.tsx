@@ -2,14 +2,22 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Bot, Inbox, Loader2, Plus, Send, User } from "lucide-react";
+import { Bot, Inbox, Loader2, Plus, Send, User, Headset } from "lucide-react";
 
 type Ticket = {
   id: string;
   subject: string;
-  message: string;
-  status: "open" | "answered" | "closed";
-  ai_response: string | null;
+  status: "open" | "closed" | "answered";
+  ai_enabled: boolean;
+  claimed_by: string | null;
+  created_at: string;
+};
+
+type TicketMessage = {
+  id: string;
+  sender: "user" | "ai" | "admin";
+  sender_user_id: string | null;
+  body: string;
   created_at: string;
 };
 
@@ -21,6 +29,9 @@ const statusStyles: Record<Ticket["status"], string> = {
 
 export function SupportClient() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [messagesByTicket, setMessagesByTicket] = useState<Record<string, TicketMessage[]>>({});
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [replyMessage, setReplyMessage] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [composing, setComposing] = useState(false);
@@ -55,6 +66,23 @@ export function SupportClient() {
     refresh();
   }, []);
 
+  const fetchMessages = async (ticketId: string) => {
+    setLoadingMessages(true);
+    try {
+      const res = await fetch(`/api/tickets/${ticketId}/messages`, { cache: "no-store" });
+      const body = await res.json();
+      if (!res.ok) {
+        toast.error(body.error || "No se pudieron cargar los mensajes");
+        return;
+      }
+      setMessagesByTicket((prev) => ({ ...prev, [ticketId]: body.messages || [] }));
+    } catch {
+      toast.error("Error cargando mensajes del ticket");
+    } finally {
+      setLoadingMessages(false);
+    }
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (subject.trim().length < 4 || message.trim().length < 10) {
@@ -79,7 +107,10 @@ export function SupportClient() {
       setMessage("");
       setComposing(false);
       await refresh();
-      if (body.ticketId) setSelectedId(body.ticketId);
+      if (body.ticketId) {
+        setSelectedId(body.ticketId);
+        await fetchMessages(body.ticketId);
+      }
     } catch {
       toast.error("Error de red");
     } finally {
@@ -87,7 +118,40 @@ export function SupportClient() {
     }
   };
 
+  const sendReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selected || replyMessage.trim().length < 1) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/tickets/${selected.id}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: replyMessage })
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        toast.error(body.error || "No se pudo enviar el mensaje");
+        return;
+      }
+
+      setReplyMessage("");
+      await fetchMessages(selected.id);
+      await refresh();
+    } catch {
+      toast.error("Error enviando respuesta");
+    }
+  };
+
   const selected = tickets.find((t) => t.id === selectedId) ?? tickets[0] ?? null;
+  const selectedMessages = selected ? messagesByTicket[selected.id] || [] : [];
+
+  useEffect(() => {
+    if (!selected?.id) return;
+    if (messagesByTicket[selected.id]) return;
+    fetchMessages(selected.id);
+  }, [selected?.id]);
 
   if (authError) {
     return (
@@ -138,6 +202,7 @@ export function SupportClient() {
                 onClick={() => {
                   setSelectedId(t.id);
                   setComposing(false);
+                  fetchMessages(t.id);
                 }}
                 className={`w-full border-b border-[var(--color-border)] p-3 text-left text-sm transition ${
                   selected?.id === t.id
@@ -152,9 +217,6 @@ export function SupportClient() {
                   >
                     {t.status}
                   </span>
-                </div>
-                <div className="mt-1 truncate text-xs text-[var(--color-text-muted)]">
-                  {t.message}
                 </div>
                 <div className="mt-1 text-[10px] text-[var(--color-text-dim)]">
                   {new Date(t.created_at).toLocaleString()}
@@ -227,46 +289,70 @@ export function SupportClient() {
             </div>
 
             <div className="mt-6 space-y-4">
-              <div className="flex gap-3">
-                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--color-card-hover)] text-white">
-                  <User size={16} />
+              {!selected.ai_enabled ? (
+                <div className="rounded-lg border border-[var(--color-warning)]/35 bg-[var(--color-warning)]/10 px-3 py-2 text-xs text-[var(--color-warning)]">
+                  Ticket tomado por soporte humano. NitroBot ya no respondera en este ticket.
                 </div>
-                <div className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-                  <div className="text-xs text-[var(--color-text-dim)]">Tu mensaje</div>
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-white">
-                    {selected.message}
-                  </p>
-                </div>
-              </div>
+              ) : null}
 
-              {selected.ai_response ? (
-                <div className="flex gap-3">
-                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--color-accent)] text-white">
-                    <Bot size={16} />
-                  </div>
-                  <div className="flex-1 rounded-lg border border-[var(--color-accent)]/40 bg-[var(--color-accent-soft)] p-4">
-                    <div className="flex items-center gap-2 text-xs text-[var(--color-info)]">
-                      <span className="font-semibold">NitroBot AI</span>
-                      <span className="rounded-full bg-[var(--color-info)]/20 px-2 py-0.5 text-[9px] uppercase tracking-wide">
-                        IA
-                      </span>
-                    </div>
-                    <p className="mt-2 whitespace-pre-wrap text-sm text-white">
-                      {selected.ai_response}
-                    </p>
-                  </div>
+              {loadingMessages ? (
+                <div className="flex items-center gap-2 text-sm text-[var(--color-text-muted)]">
+                  <Loader2 size={14} className="animate-spin" /> Cargando conversacion...
                 </div>
+              ) : selectedMessages.length === 0 ? (
+                <div className="text-sm text-[var(--color-text-muted)]">Sin mensajes todavia.</div>
               ) : (
-                <div className="flex gap-3">
-                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--color-accent)] text-white">
-                    <Bot size={16} />
-                  </div>
-                  <div className="flex flex-1 items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-sm text-[var(--color-text-muted)]">
-                    <Loader2 size={14} className="animate-spin" />
-                    NitroBot esta analizando tu ticket...
-                  </div>
-                </div>
+                selectedMessages.map((m) => {
+                  const isAI = m.sender === "ai";
+                  const isAdmin = m.sender === "admin";
+                  return (
+                    <div key={m.id} className="flex gap-3">
+                      <div
+                        className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-white ${
+                          isAI
+                            ? "bg-[var(--color-accent)]"
+                            : isAdmin
+                            ? "bg-[var(--color-success)]"
+                            : "bg-[var(--color-card-hover)]"
+                        }`}
+                      >
+                        {isAI ? <Bot size={16} /> : isAdmin ? <Headset size={16} /> : <User size={16} />}
+                      </div>
+                      <div
+                        className={`flex-1 rounded-lg border p-4 ${
+                          isAI
+                            ? "border-[var(--color-accent)]/40 bg-[var(--color-accent-soft)]"
+                            : isAdmin
+                            ? "border-[var(--color-success)]/40 bg-[var(--color-success)]/10"
+                            : "border-[var(--color-border)] bg-[var(--color-surface)]"
+                        }`}
+                      >
+                        <div className="text-xs text-[var(--color-text-dim)]">
+                          {isAI ? "NitroBot AI" : isAdmin ? "Soporte" : "Tu"}
+                        </div>
+                        <p className="mt-1 whitespace-pre-wrap text-sm text-white">{m.body}</p>
+                      </div>
+                    </div>
+                  );
+                })
               )}
+
+              <form onSubmit={sendReply} className="pt-2">
+                <div className="flex gap-2">
+                  <input
+                    value={replyMessage}
+                    onChange={(e) => setReplyMessage(e.target.value)}
+                    placeholder="Escribe un mensaje para soporte..."
+                    className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white placeholder:text-[var(--color-text-dim)] focus:border-[var(--color-accent)] focus:outline-none"
+                  />
+                  <button
+                    type="submit"
+                    className="inline-flex items-center gap-2 rounded-md bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--color-accent-hover)]"
+                  >
+                    <Send size={14} /> Enviar
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         ) : null}

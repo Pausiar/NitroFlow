@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { env } from "@/lib/env";
 
 const NIM_TIMEOUT_MS = Number(process.env.NVIDIA_NIM_TIMEOUT_MS || "12000");
+const NIM_FALLBACK_MODELS = ["z-ai/glm-5.1", "zai-org/glm-5.1", "glm-5.1"];
 
 const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
   let timeoutHandle: NodeJS.Timeout | undefined;
@@ -32,38 +33,55 @@ export const analyzeTicketWithNim = async (input: {
     };
   }
 
-  const client = new OpenAI({
-    baseURL: env.nvidiaBaseUrl,
-    apiKey: env.nvidiaApiKey
-  });
+  const baseUrl = (env.nvidiaBaseUrl || "https://integrate.api.nvidia.com/v1").replace(/\/+$/, "");
+  const client = new OpenAI({ baseURL: baseUrl, apiKey: env.nvidiaApiKey });
 
-  const completion = await withTimeout(
-    client.chat.completions.create({
-      model: env.nvidiaModel,
-      messages: [
-        {
-          role: "system",
-          content:
-            "Eres el asistente de soporte de NitroFlow. Responde de forma clara y breve: causa probable, pasos concretos y verificacion final."
-        },
-        {
-          role: "user",
-          content: `Ticket: ${input.subject}\n\nDescripcion: ${input.message}\n\nContexto del proyecto: ${input.projectContext || "No provisto"}`
-        }
-      ],
-      temperature: 0.2,
-      top_p: 0.9,
-      max_tokens: 700
-    } as any),
-    NIM_TIMEOUT_MS
+  const modelCandidates = Array.from(
+    new Set([env.nvidiaModel, ...NIM_FALLBACK_MODELS].filter(Boolean))
   );
 
-  const content =
-    completion.choices[0]?.message?.content?.trim() ||
-    "No se pudo generar una respuesta automatica.";
+  let lastError: Error | null = null;
+  for (const model of modelCandidates) {
+    try {
+      const completion = await withTimeout(
+        client.chat.completions.create({
+          model,
+          messages: [
+            {
+              role: "system",
+              content:
+                "Eres el asistente de soporte de NitroFlow. Responde de forma clara y breve: causa probable, pasos concretos y verificacion final."
+            },
+            {
+              role: "user",
+              content: `Ticket: ${input.subject}\n\nDescripcion: ${input.message}\n\nContexto del proyecto: ${input.projectContext || "No provisto"}`
+            }
+          ],
+          temperature: 0.2,
+          top_p: 0.9,
+          max_tokens: 700
+        } as any),
+        NIM_TIMEOUT_MS
+      );
 
-  return {
-    userResponse: content,
-    adminSummary: content.slice(0, 600)
-  };
+      const content =
+        completion.choices[0]?.message?.content?.trim() ||
+        "No se pudo generar una respuesta automatica.";
+
+      return {
+        userResponse: content,
+        adminSummary: `[model=${model}] ${content.slice(0, 560)}`
+      };
+    } catch (err) {
+      const status = (err as { status?: number })?.status;
+      const message = err instanceof Error ? err.message : "NIM request failed";
+      lastError = new Error(`[model=${model}] status=${status ?? "unknown"} ${message}`);
+
+      if (status && status !== 404) {
+        break;
+      }
+    }
+  }
+
+  throw lastError || new Error("NIM request failed");
 };

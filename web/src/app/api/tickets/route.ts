@@ -32,7 +32,7 @@ export async function GET() {
 
     const { data, error } = await supabase
       .from("tickets")
-      .select("id, subject, message, status, ai_response, created_at")
+      .select("id, subject, status, ai_enabled, claimed_by, claimed_at, created_at")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
@@ -78,14 +78,23 @@ export async function POST(request: Request) {
     .insert({
       user_id: user.id,
       subject: payload.data.subject,
-      message: payload.data.message
+      message: payload.data.message,
+      ai_enabled: true,
+      status: "open"
     })
-    .select("id")
+    .select("id, subject")
     .single();
 
   if (insertError || !ticket) {
     return NextResponse.json({ error: "No se pudo guardar el ticket" }, { status: 500 });
   }
+
+  await supabase.from("ticket_messages").insert({
+    ticket_id: ticket.id,
+    sender: "user",
+    sender_user_id: user.id,
+    body: payload.data.message
+  });
 
   let analysis = {
     userResponse:
@@ -96,7 +105,7 @@ export async function POST(request: Request) {
   let aiErrorMessage: string | null = null;
   try {
     analysis = await analyzeTicketWithNim({
-      subject: payload.data.subject,
+      subject: ticket.subject,
       message: payload.data.message,
       projectContext:
         "NitroFlow desktop (Electron) + NitroFlow web (Next.js, Supabase, Stripe)."
@@ -109,14 +118,18 @@ export async function POST(request: Request) {
 
   try {
     const adminClient = createServiceClient();
-    await adminClient
-      .from("tickets")
-      .update({
-        ai_response: analysis.userResponse,
-        ai_error_summary: analysis.adminSummary,
-        status: aiGenerated ? "answered" : "open"
-      })
-      .eq("id", ticket.id);
+    if (aiGenerated) {
+      await adminClient.from("ticket_messages").insert({
+        ticket_id: ticket.id,
+        sender: "ai",
+        body: analysis.userResponse
+      });
+
+      await adminClient
+        .from("tickets")
+        .update({ ai_response: analysis.userResponse, ai_error_summary: analysis.adminSummary })
+        .eq("id", ticket.id);
+    }
 
     const shouldAlertAdmin =
       aiGenerated &&
@@ -142,6 +155,6 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     ticketId: ticket.id,
-    aiResponse: analysis.userResponse
+    aiResponse: aiGenerated ? analysis.userResponse : null
   });
 }
