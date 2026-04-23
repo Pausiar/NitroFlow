@@ -67,6 +67,7 @@ export function AdminPanel() {
   const [replyByTicket, setReplyByTicket] = useState<Record<string, string>>({});
   const [sendingByTicket, setSendingByTicket] = useState<Record<string, boolean>>({});
   const [claimingByTicket, setClaimingByTicket] = useState<Record<string, boolean>>({});
+  const [openTicketId, setOpenTicketId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [code, setCode] = useState("");
@@ -153,6 +154,13 @@ export function AdminPanel() {
       toast.error("Error de red");
     } finally {
       setSendingByTicket((prev) => ({ ...prev, [ticketId]: false }));
+    }
+  };
+
+  const toggleTicketOpen = (ticketId: string) => {
+    setOpenTicketId((prev) => (prev === ticketId ? null : ticketId));
+    if (!messagesByTicket[ticketId]) {
+      fetchTicketMessages(ticketId);
     }
   };
 
@@ -361,17 +369,15 @@ export function AdminPanel() {
               </div>
             ) : (
               tickets.map((t) => (
-                <details
+                <div
                   key={t.id}
-                  onToggle={(ev) => {
-                    const open = (ev.currentTarget as HTMLDetailsElement).open;
-                    if (open && !messagesByTicket[t.id]) {
-                      fetchTicketMessages(t.id);
-                    }
-                  }}
                   className="rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-4"
                 >
-                  <summary className="flex cursor-pointer items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => toggleTicketOpen(t.id)}
+                    className="flex w-full items-center justify-between gap-3 text-left"
+                  >
                     <div className="min-w-0">
                       <p className="truncate font-semibold text-white">{t.subject}</p>
                       <p className="text-xs text-[var(--color-text-dim)]">
@@ -381,7 +387,8 @@ export function AdminPanel() {
                     <span className="rounded-full bg-[var(--color-surface)] px-2 py-0.5 text-xs uppercase text-[var(--color-text-muted)]">
                       {t.status}
                     </span>
-                  </summary>
+                  </button>
+                  {openTicketId === t.id ? (
                   <div className="mt-3 space-y-3 text-sm">
                     <div>
                       <div className="mb-2 flex items-center justify-between gap-2">
@@ -475,7 +482,8 @@ export function AdminPanel() {
                       </div>
                     ) : null}
                   </div>
-                </details>
+                  ) : null}
+                </div>
               ))
             )}
           </div>
