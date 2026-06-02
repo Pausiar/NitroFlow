@@ -3,32 +3,33 @@ import { createClient } from "@/lib/supabase-server";
 import { createServiceClient } from "@/lib/supabase-service";
 
 const ensureAdmin = async () => {
-  const supabase = await createClient();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user }
+    } = await supabase.auth.getUser();
 
-  if (!user) {
+    if (!user) {
+      return null;
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (profile?.role !== "admin") {
+      return null;
+    }
+
+    return user;
+  } catch {
     return null;
   }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (profile?.role !== "admin") {
-    return null;
-  }
-
-  return user;
 };
 
-export async function POST(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const adminUser = await ensureAdmin();
   if (!adminUser) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -47,7 +48,7 @@ export async function POST(
     .eq("id", id);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "No se pudo asignar el ticket" }, { status: 503 });
   }
 
   return NextResponse.json({ ok: true });

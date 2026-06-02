@@ -8,17 +8,26 @@ import {
   ShieldCheck,
   Sparkles
 } from "lucide-react";
+import type { User } from "@supabase/supabase-js";
 import { createClient as createServerSupabase } from "@/lib/supabase-server";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { BuyProButton } from "@/components/BuyProButton";
+import type { Profile } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
+type RecentTicket = {
+  id: string;
+  subject: string;
+  status: "open" | "answered" | "closed";
+  created_at: string;
+};
+
 export default async function DashboardPage() {
-  let user: any = null;
-  let profile: any = null;
-  let recentTickets: any[] = [];
+  let user: User | null = null;
+  let profile: Pick<Profile, "plan" | "role" | "full_name"> | null = null;
+  let recentTickets: RecentTicket[] = [];
 
   try {
     const supabase = await createServerSupabase();
@@ -125,7 +134,7 @@ export default async function DashboardPage() {
             </h2>
             <p className="mt-1 text-sm text-[var(--color-text-muted)]">
               {isPro
-                ? "Tienes acceso completo: limpieza profunda, asistente IA online y licencia para la app de escritorio."
+                ? "Tienes acceso completo: limpieza profunda, asistente con IA online y licencia para la app de escritorio."
                 : "Estas usando el plan gratuito. Pasa a Pro para desbloquear todas las herramientas y la licencia para la app."}
             </p>
             {!isPro ? (
@@ -224,14 +233,9 @@ export default async function DashboardPage() {
               >
                 Ver planes
               </Link>
-              <a
-                href="https://github.com/Pausiar/NitroFlow"
-                target="_blank"
-                rel="noreferrer"
-                className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white hover:border-[var(--color-border-strong)]"
-              >
-                Descargar app
-              </a>
+              <span className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-muted)]">
+                Descarga disponible desde tu panel Pro
+              </span>
             </div>
           </div>
         </div>

@@ -1,16 +1,41 @@
 import Link from "next/link";
-import { ShieldCheck, Sparkles } from "lucide-react";
+import { ShieldCheck, Sparkles, AlertTriangle } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { GoogleLoginButton } from "@/components/GoogleLoginButton";
+import { getMissingSupabasePublicEnv } from "@/lib/public-env";
 
 export const dynamic = "force-dynamic";
 
-export default function LoginPage({
-  searchParams
-}: {
-  searchParams: { next?: string };
-}) {
-  const next = searchParams?.next || "/dashboard";
+type LoginPageProps = {
+  searchParams: Promise<{ next?: string; error?: string }>;
+};
+
+const getSafeNextPath = (next?: string) => {
+  if (!next || !next.startsWith("/") || next.startsWith("//")) {
+    return "/dashboard";
+  }
+  return next;
+};
+
+const getAuthErrorMessage = (error?: string) => {
+  if (error === "supabase_config") {
+    return "Supabase no esta configurado. Define las variables publicas antes de habilitar el login.";
+  }
+  if (error === "supabase_unavailable") {
+    return "No podemos conectar con Supabase ahora mismo. Si el proyecto estaba pausado, reanudalo y vuelve a intentarlo.";
+  }
+  if (error === "auth") {
+    return "Google no pudo completar el inicio de sesion. Revisa las URL de redireccion autorizadas.";
+  }
+  return null;
+};
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const params = await searchParams;
+  const next = getSafeNextPath(params.next);
+  const missingSupabaseEnv = getMissingSupabasePublicEnv();
+  const authError = getAuthErrorMessage(params.error);
+  const loginDisabled = missingSupabaseEnv.length > 0;
 
   return (
     <main className="relative grid min-h-screen place-items-center overflow-hidden px-4 py-12">
@@ -43,14 +68,33 @@ export default function LoginPage({
             Inicia sesion para acceder a tu panel y a la licencia.
           </p>
 
+          {authError ? (
+            <div className="mt-5 rounded-lg border border-[var(--color-warning)]/40 bg-[var(--color-warning)]/10 p-3 text-sm text-[var(--color-warning)]">
+              <div className="flex gap-2">
+                <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+                <p>{authError}</p>
+              </div>
+            </div>
+          ) : null}
+
+          {missingSupabaseEnv.length > 0 ? (
+            <div className="mt-5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-xs text-[var(--color-text-muted)]">
+              <p className="font-semibold text-white">Configuracion pendiente</p>
+              <p className="mt-1">
+                Faltan variables: {missingSupabaseEnv.join(", ")}. Configuralas en Vercel o en
+                desarrollo local para activar Google OAuth.
+              </p>
+            </div>
+          ) : null}
+
           <div className="mt-8">
-            <GoogleLoginButton next={next} />
+            <GoogleLoginButton next={next} disabled={loginDisabled} />
           </div>
 
           <div className="mt-6 flex flex-col gap-2 text-xs text-[var(--color-text-dim)]">
             <p className="flex items-center gap-1.5">
               <ShieldCheck size={12} className="text-[var(--color-success)]" />
-              Tu sesion se gestiona con Supabase Auth.
+              Tu sesion se gestiona de forma segura con Supabase Auth.
             </p>
             <p className="flex items-center gap-1.5">
               <Sparkles size={12} className="text-[var(--color-info)]" />

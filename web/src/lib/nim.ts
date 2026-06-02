@@ -1,8 +1,8 @@
 import OpenAI from "openai";
 import { env } from "@/lib/env";
 
-const NIM_TIMEOUT_MS = Number(process.env.NVIDIA_NIM_TIMEOUT_MS || "12000");
-const NIM_FALLBACK_MODELS = ["z-ai/glm-5.1", "zai-org/glm-5.1", "glm-5.1"];
+const AI_TIMEOUT_MS = Number(process.env.AI_PROVIDER_TIMEOUT_MS || process.env.NVIDIA_NIM_TIMEOUT_MS || "12000");
+const AI_FALLBACK_MODELS = ["z-ai/glm-5.1", "zai-org/glm-5.1", "glm-5.1"];
 
 const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
   let timeoutHandle: NodeJS.Timeout | undefined;
@@ -10,7 +10,7 @@ const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number): Promise<T
     return await Promise.race([
       promise,
       new Promise<T>((_resolve, reject) => {
-        timeoutHandle = setTimeout(() => reject(new Error("NIM_TIMEOUT")), timeoutMs);
+        timeoutHandle = setTimeout(() => reject(new Error("AI_TIMEOUT")), timeoutMs);
       })
     ]);
   } finally {
@@ -25,19 +25,19 @@ export const analyzeTicketWithNim = async (input: {
   message: string;
   projectContext?: string;
 }) => {
-  if (!env.nvidiaApiKey) {
+  if (!env.aiProviderApiKey) {
     return {
       userResponse:
-        "No pude analizar con IA porque falta configurar NVIDIA NIM API key en el servidor.",
-      adminSummary: "NVIDIA NIM API key no configurada"
+        "Hemos recibido tu ticket y un agente humano lo revisara en breve.",
+      adminSummary: "Proveedor de IA no configurado"
     };
   }
 
-  const baseUrl = (env.nvidiaBaseUrl || "https://integrate.api.nvidia.com/v1").replace(/\/+$/, "");
-  const client = new OpenAI({ baseURL: baseUrl, apiKey: env.nvidiaApiKey });
+  const baseUrl = (env.aiProviderBaseUrl || "https://integrate.api.nvidia.com/v1").replace(/\/+$/, "");
+  const client = new OpenAI({ baseURL: baseUrl, apiKey: env.aiProviderApiKey });
 
   const modelCandidates = Array.from(
-    new Set([env.nvidiaModel, ...NIM_FALLBACK_MODELS].filter(Boolean))
+    new Set([env.aiProviderModel, ...AI_FALLBACK_MODELS].filter(Boolean))
   );
 
   let lastError: Error | null = null;
@@ -60,8 +60,8 @@ export const analyzeTicketWithNim = async (input: {
           temperature: 0.2,
           top_p: 0.9,
           max_tokens: 700
-        } as any),
-        NIM_TIMEOUT_MS
+        }),
+        AI_TIMEOUT_MS
       );
 
       const content =
@@ -74,7 +74,7 @@ export const analyzeTicketWithNim = async (input: {
       };
     } catch (err) {
       const status = (err as { status?: number })?.status;
-      const message = err instanceof Error ? err.message : "NIM request failed";
+      const message = err instanceof Error ? err.message : "AI request failed";
       lastError = new Error(`[model=${model}] status=${status ?? "unknown"} ${message}`);
 
       if (status && status !== 404) {
@@ -83,5 +83,5 @@ export const analyzeTicketWithNim = async (input: {
     }
   }
 
-  throw lastError || new Error("NIM request failed");
+  throw lastError || new Error("AI request failed");
 };

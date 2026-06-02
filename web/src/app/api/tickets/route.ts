@@ -37,15 +37,12 @@ export async function GET() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: "No se pudieron cargar los tickets" }, { status: 503 });
     }
 
     return NextResponse.json({ tickets: data ?? [] });
-  } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Error" },
-      { status: 500 }
-    );
+  } catch {
+    return NextResponse.json({ error: "Servicio no disponible" }, { status: 503 });
   }
 }
 
@@ -58,11 +55,8 @@ export async function POST(request: Request) {
   let supabase;
   try {
     supabase = await createClient();
-  } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Supabase no configurado" },
-      { status: 500 }
-    );
+  } catch {
+    return NextResponse.json({ error: "Servicio no disponible" }, { status: 503 });
   }
 
   const {
@@ -112,8 +106,8 @@ export async function POST(request: Request) {
     });
     aiGenerated = true;
   } catch (err) {
-    aiErrorMessage = err instanceof Error ? err.message : "NIM unavailable";
-    // mantenemos respuesta por defecto si falla NIM
+    aiErrorMessage = err instanceof Error ? err.message : "AI unavailable";
+    // mantenemos respuesta por defecto si falla el asistente
   }
 
   try {
@@ -145,12 +139,12 @@ export async function POST(request: Request) {
     } else if (aiErrorMessage) {
       await adminClient.from("admin_alerts").insert({
         ticket_id: ticket.id,
-        title: "NIM no disponible o lento",
+        title: "Asistente IA no disponible o lento",
         message: `No se pudo procesar IA para el ticket ${ticket.id}: ${aiErrorMessage}`
       });
     }
   } catch {
-    // si falta service key, el ticket existe y la IA respondio igualmente al usuario
+    // si falta configuracion de servicio, el ticket existe igualmente
   }
 
   return NextResponse.json({

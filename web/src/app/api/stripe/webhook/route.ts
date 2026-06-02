@@ -7,7 +7,7 @@ import { createServiceClient } from "@/lib/supabase-service";
 
 export async function POST(request: Request) {
   if (!env.stripeWebhookSecret) {
-    return NextResponse.json({ error: "Missing STRIPE_WEBHOOK_SECRET" }, { status: 500 });
+    return NextResponse.json({ error: "Webhook no configurado" }, { status: 503 });
   }
 
   const body = await request.text();

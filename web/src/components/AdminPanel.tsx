@@ -15,6 +15,7 @@ import {
   User,
   Users
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 type Promo = {
   id: string;
@@ -211,7 +212,7 @@ export function AdminPanel() {
     pendingAlerts: alerts.filter((a) => !a.resolved).length
   };
 
-  const tabs: { id: Tab; label: string; icon: any; badge?: number }[] = [
+  const tabs: { id: Tab; label: string; icon: LucideIcon; badge?: number }[] = [
     { id: "overview", label: "Resumen", icon: Users },
     { id: "promos", label: "Codigos promo", icon: Tag, badge: stats.activePromos },
     { id: "tickets", label: "Tickets", icon: TicketIcon, badge: stats.openTickets },
@@ -539,7 +540,7 @@ function StatCard({
 }: {
   label: string;
   value: number;
-  icon: any;
+  icon: LucideIcon;
   color?: "info" | "success" | "warning";
 }) {
   const tones: Record<string, string> = {
