@@ -1,10 +1,7 @@
 import { createBrowserClient } from "@supabase/ssr";
-import { env } from "@/lib/env";
+import { assertSupabasePublicEnv, publicEnv } from "@/lib/public-env";
 
 export const createClient = () => {
-  if (!env.supabaseUrl || !env.supabaseAnonKey) {
-    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY");
-  }
-
-  return createBrowserClient(env.supabaseUrl, env.supabaseAnonKey);
+  assertSupabasePublicEnv();
+  return createBrowserClient(publicEnv.supabaseUrl, publicEnv.supabaseAnonKey);
 };

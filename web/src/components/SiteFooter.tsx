@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { LogoMark } from "@/components/Logo";
-import { Github } from "lucide-react";
 
 export function SiteFooter() {
   return (
@@ -12,15 +11,9 @@ export function SiteFooter() {
             Optimizador inteligente para Windows que combina herramientas profesionales con un
             asistente de IA para que tu PC siempre rinda al maximo.
           </p>
-          <a
-            href="https://github.com/Pausiar/NitroFlow"
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 text-sm text-[var(--color-text-muted)] hover:text-white"
-          >
-            <Github size={16} />
-            github.com/Pausiar/NitroFlow
-          </a>
+          <p className="text-sm text-[var(--color-text-muted)]">
+            Producto privado en desarrollo activo. Contacto: soporte desde tu panel.
+          </p>
         </div>
 
         <div>
@@ -45,7 +38,7 @@ export function SiteFooter() {
       <div className="border-t border-[var(--color-border)]">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 text-xs text-[var(--color-text-dim)] sm:px-6">
           <span>(c) {new Date().getFullYear()} NitroFlow. Todos los derechos reservados.</span>
-          <span>Hecho con Next.js, Supabase, Stripe y NVIDIA NIM.</span>
+          <span>Hecho con una arquitectura segura para producto digital.</span>
         </div>
       </div>
     </footer>

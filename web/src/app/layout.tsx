@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "sonner";
+import { env } from "@/lib/env";
 
 export const metadata: Metadata = {
   title: "NitroFlow - Optimizador inteligente para Windows",
   description:
     "Optimizador de Windows con limpieza profunda, panel de rendimiento y asistente IA. Plan Free y Pro.",
-  metadataBase: new URL("https://nitroflow.app"),
+  metadataBase: new URL(env.appUrl),
   openGraph: {
     title: "NitroFlow",
     description: "Optimizador inteligente para Windows con asistente IA.",

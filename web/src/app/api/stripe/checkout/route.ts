@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase-server";
 import { env } from "@/lib/env";
 import { getStripe } from "@/lib/stripe";
+import type Stripe from "stripe";
 
 const bodySchema = z.object({
   promoCode: z.string().nullable().optional()
@@ -10,10 +11,16 @@ const bodySchema = z.object({
 
 export async function POST(request: Request) {
   if (!env.stripeProPriceId) {
-    return NextResponse.json({ error: "Missing STRIPE_PRO_PRICE_ID" }, { status: 500 });
+    return NextResponse.json({ error: "Checkout no configurado" }, { status: 503 });
   }
 
-  const supabase = await createClient();
+  let supabase;
+  try {
+    supabase = await createClient();
+  } catch {
+    return NextResponse.json({ error: "Servicio no disponible" }, { status: 503 });
+  }
+
   const {
     data: { user }
   } = await supabase.auth.getUser();
@@ -46,20 +53,25 @@ export async function POST(request: Request) {
     stripePromotionCodeId = promo.stripe_promotion_code_id || undefined;
   }
 
-  const stripe = getStripe();
-  const session = await stripe.checkout.sessions.create({
-    mode: "subscription",
-    line_items: [{ price: env.stripeProPriceId, quantity: 1 }],
-    customer_email: user.email,
-    success_url: `${env.appUrl}/dashboard?paid=1`,
-    cancel_url: `${env.appUrl}/?canceled=1`,
-    allow_promotion_codes: true,
-    discounts: stripePromotionCodeId ? [{ promotion_code: stripePromotionCodeId }] : undefined,
-    metadata: {
-      userId: user.id,
-      promoCode: normalizedPromoCode || ""
-    }
-  });
+  let session: Stripe.Checkout.Session;
+  try {
+    const stripe = getStripe();
+    session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      line_items: [{ price: env.stripeProPriceId, quantity: 1 }],
+      customer_email: user.email,
+      success_url: `${env.appUrl}/dashboard?paid=1`,
+      cancel_url: `${env.appUrl}/?canceled=1`,
+      allow_promotion_codes: true,
+      discounts: stripePromotionCodeId ? [{ promotion_code: stripePromotionCodeId }] : undefined,
+      metadata: {
+        userId: user.id,
+        promoCode: normalizedPromoCode || ""
+      }
+    });
+  } catch {
+    return NextResponse.json({ error: "No se pudo iniciar el checkout" }, { status: 503 });
+  }
 
   return NextResponse.json({ url: session.url });
 }

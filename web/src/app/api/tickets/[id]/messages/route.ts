@@ -68,7 +68,7 @@ export async function GET(
     .order("created_at", { ascending: true });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "No se pudieron cargar los mensajes" }, { status: 503 });
   }
 
   return NextResponse.json({
@@ -113,7 +113,7 @@ export async function POST(
   });
 
   if (insertError) {
-    return NextResponse.json({ error: insertError.message }, { status: 500 });
+    return NextResponse.json({ error: "No se pudo guardar el mensaje" }, { status: 503 });
   }
 
   if (role === "admin") {
@@ -156,10 +156,10 @@ export async function POST(
 
       return NextResponse.json({ ok: true, responder: "ai" });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "NIM unavailable";
+      const message = err instanceof Error ? err.message : "AI unavailable";
       await adminClient.from("admin_alerts").insert({
         ticket_id: id,
-        title: "NIM no disponible o lento",
+        title: "Asistente IA no disponible o lento",
         message: `No se pudo procesar IA para el ticket ${id}: ${message}`
       });
 

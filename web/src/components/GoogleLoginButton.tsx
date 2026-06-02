@@ -4,38 +4,46 @@ import { createClient } from "@/lib/supabase-client";
 import { useState } from "react";
 import { toast } from "sonner";
 
-export function GoogleLoginButton({ next = "/dashboard" }: { next?: string }) {
+type GoogleLoginButtonProps = {
+  next?: string;
+  disabled?: boolean;
+};
+
+export function GoogleLoginButton({ next = "/dashboard", disabled = false }: GoogleLoginButtonProps) {
   const [loading, setLoading] = useState(false);
 
   const login = async () => {
+    if (disabled) return;
+
     setLoading(true);
     try {
       const supabase = createClient();
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/api/auth/callback?next=${encodeURIComponent(next)}`
+          redirectTo: `${window.location.origin}/api/auth/callback?next=${encodeURIComponent(next)}`,
+          queryParams: {
+            access_type: "offline",
+            prompt: "select_account"
+          }
         }
       });
       if (error) {
-        toast.error(error.message);
+        toast.error("No se pudo iniciar sesion con Google. Revisa la configuracion de OAuth.");
         setLoading(false);
       }
-    } catch (err) {
-      toast.error(
-        err instanceof Error
-          ? err.message
-          : "Falta configurar Supabase. Revisa NEXT_PUBLIC_SUPABASE_URL."
-      );
+    } catch {
+      toast.error("El inicio de sesion no esta disponible ahora mismo. Revisa la configuracion de Supabase.");
       setLoading(false);
     }
   };
 
   return (
     <button
+      type="button"
       onClick={login}
-      disabled={loading}
-      className="inline-flex w-full items-center justify-center gap-3 rounded-md border border-[var(--color-border)] bg-white px-5 py-3 text-sm font-medium text-[#1f1f1f] transition hover:bg-[#f5f5f7] disabled:opacity-60"
+      disabled={loading || disabled}
+      className="inline-flex w-full items-center justify-center gap-3 rounded-md border border-[var(--color-border)] bg-white px-5 py-3 text-sm font-medium text-[#1f1f1f] transition hover:bg-[#f5f5f7] disabled:cursor-not-allowed disabled:opacity-60"
     >
       <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
         <path

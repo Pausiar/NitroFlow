@@ -19,7 +19,7 @@ export default function SupportPage() {
             </div>
             <h1 className="mt-1 text-3xl font-bold text-white">Como podemos ayudarte?</h1>
             <p className="mt-1 max-w-2xl text-sm text-[var(--color-text-muted)]">
-              Crea un ticket y nuestro asistente <strong className="text-white">NitroBot AI</strong> te
+              Crea un ticket y nuestro asistente <strong className="text-white">NitroBot</strong> te
               respondera en segundos. Si el caso es complejo, un humano lo revisara.
             </p>
           </div>
@@ -37,7 +37,7 @@ export default function SupportPage() {
             <div>
               <p className="text-sm font-semibold text-white">Respuesta IA inmediata</p>
               <p className="text-xs text-[var(--color-text-muted)]">
-                Powered by NVIDIA NIM (z-ai/glm-5.1).
+                Asistencia automatizada para respuestas rapidas.
               </p>
             </div>
           </div>

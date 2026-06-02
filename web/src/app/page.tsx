@@ -50,7 +50,7 @@ const features = [
   },
   {
     icon: Bot,
-    title: "Asistente IA (NVIDIA NIM)",
+    title: "Asistente con IA",
     description:
       "Recibe el contexto de tu sistema y responde dudas tecnicas. Recomendaciones personalizadas y seguras."
   }
@@ -70,11 +70,11 @@ const faqs = [
   },
   {
     q: "Como funciona el asistente de IA?",
-    a: "Usamos NVIDIA NIM (modelo z-ai/glm-5.1) para analizar el contexto de tu sistema, responder preguntas y proponer optimizaciones. Nunca ejecuta acciones sin tu confirmacion."
+    a: "El asistente analiza el contexto que compartes para responder preguntas y proponer optimizaciones. Nunca ejecuta acciones sin tu confirmacion."
   },
   {
     q: "Como verifica la app de escritorio mi licencia Pro?",
-    a: "La app llama a /api/verify-license con tu token de Google. La web comprueba en Supabase si tu plan es Pro y devuelve { licensed: true } al instante."
+    a: "La licencia se valida de forma segura desde el servidor. El sistema comprueba el estado de activacion y habilita las funciones correspondientes sin exponer claves ni logica interna."
   },
   {
     q: "Puedo cancelar el plan Pro?",
@@ -94,7 +94,7 @@ export default function HomePage() {
             <div className="mx-auto max-w-3xl text-center">
               <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-[var(--color-card)]/60 px-3 py-1 text-xs text-[var(--color-text-muted)] backdrop-blur">
                 <Sparkles size={12} className="text-[var(--color-accent)]" />
-                Nuevo: asistente IA con NVIDIA NIM
+                Nuevo: asistente con IA
               </div>
               <h1 className="mt-6 text-4xl font-bold tracking-tight text-white sm:text-6xl">
                 Optimiza tu Windows con
@@ -381,7 +381,7 @@ export default function HomePage() {
               <ul className="mt-6 space-y-2 text-sm">
                 {[
                   "Limpieza profunda + optimizador de registro",
-                  "Asistente IA online (NVIDIA NIM)",
+                  "Asistente con IA online",
                   "Licencia para la app de escritorio",
                   "Codigos promocionales y soporte prioritario",
                   "Historial extendido y exportacion"
@@ -406,23 +406,15 @@ export default function HomePage() {
                 Licencia integrada con la app
               </h2>
               <p className="mt-2 text-[var(--color-text-muted)]">
-                La app de escritorio se sincroniza con tu cuenta web mediante un endpoint
-                publico de verificacion.
+                La app de escritorio se sincroniza con tu cuenta web mediante una validacion segura desde el servidor, sin exponer claves ni logica interna.
               </p>
             </div>
             <div className="lg:col-span-2 rounded-2xl border border-[var(--color-border)] bg-[#0a0a0b] p-6 font-mono text-xs leading-relaxed text-[var(--color-text-muted)] shadow-[var(--shadow-fluent-lg)]">
               <pre className="overflow-x-auto">
-{`POST https://nitroflow.app/api/verify-license
-Content-Type: application/json
-
-{
-  "googleToken": "<id_token>"
-}
-
-200 OK
-{
-  "licensed": true
-}`}
+{`validarSesionSegura()
+  -> comprobar estado de activacion en servidor
+  -> habilitar funciones del plan correspondiente
+  -> no exponer claves, tokens ni reglas internas`}
               </pre>
             </div>
           </div>

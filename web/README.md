@@ -5,7 +5,7 @@ Landing y plataforma web para NitroFlow con:
 - Next.js (Vercel)
 - Supabase (DB + Google OAuth)
 - Stripe (checkout + webhook)
-- NVIDIA NIM API (tickets IA)
+- Proveedor de IA server-side para tickets de soporte
 
 ## 1. Instalacion
 
@@ -17,18 +17,21 @@ cp .env.example .env.local
 
 ## 2. Variables de entorno
 
-Completa `.env.local`:
+Completa `.env.local` y configura los mismos valores en Vercel:
 
-- `NEXT_PUBLIC_APP_URL` (ej: <http://localhost:3000>)
+- `NEXT_PUBLIC_APP_URL` (ej: `http://localhost:3000` en local o tu dominio publico en produccion)
 - `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` o `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`
 - `STRIPE_PRO_PRICE_ID`
-- `NVIDIA_NIM_API_KEY`
-- `NVIDIA_NIM_MODEL` (por defecto `z-ai/glm-5.1`)
+- `AI_PROVIDER_BASE_URL`
+- `AI_PROVIDER_API_KEY`
+- `AI_PROVIDER_MODEL`
 - `GOOGLE_CLIENT_ID`
+
+> Las variables legacy `NVIDIA_NIM_*` siguen soportadas como fallback privado de servidor para no romper despliegues existentes, pero no deben usarse en textos publicos.
 
 ## 3. Supabase
 
@@ -37,7 +40,9 @@ Completa `.env.local`:
 3. Añade redirect URL:
    - `http://localhost:3000/api/auth/callback`
    - `https://tu-dominio.com/api/auth/callback`
+   - `https://web-tau-two-22.vercel.app/api/auth/callback` si ese sigue siendo el dominio publico activo.
 4. Asigna rol admin en `profiles` para usuarios administradores.
+5. Mantén RLS habilitado y usa la service role key solo en rutas server-side.
 
 ## 4. Stripe
 
@@ -55,31 +60,14 @@ Completa `.env.local`:
 - Admin: `/admin`
 - Checkout API: `/api/stripe/checkout`
 - Webhook Stripe: `/api/stripe/webhook`
-- Verificacion licencia desktop: `/api/verify-license`
 
 ## 6. Flujo de licencia desktop
 
-La app desktop debe:
+La licencia se valida desde servidor. La web no debe documentar payloads reales, respuestas exactas, rutas consumibles ni reglas internas en superficies publicas. La app desktop solo debe recibir el resultado minimo necesario para habilitar o bloquear funciones Pro.
 
-1. Hacer login Google.
-2. Enviar `googleToken` a `/api/verify-license`.
-3. Leer respuesta:
+## 7. IA de soporte
 
-```json
-{ "licensed": true }
-```
-
-Si es `false`, bloquear acceso Pro.
-
-## 7. NVIDIA NIM
-
-La integracion de tickets IA usa:
-
-- `base_url`: `https://integrate.api.nvidia.com/v1`
-- `model`: `z-ai/glm-5.1`
-- `temperature=1`, `top_p=1`, `max_tokens=16384`
-- `extra_body.chat_template_kwargs.enable_thinking=true`
-- `extra_body.chat_template_kwargs.clear_thinking=false`
+La integracion de tickets IA se configura exclusivamente con variables de entorno server-side. No incluyas claves, modelos, endpoints del proveedor ni respuestas internas en paginas publicas.
 
 Implementado en `src/lib/nim.ts`.
 
