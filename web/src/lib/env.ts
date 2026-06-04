@@ -20,7 +20,8 @@ export const env = {
     "https://integrate.api.nvidia.com/v1",
   aiProviderApiKey: process.env.AI_PROVIDER_API_KEY || process.env.NVIDIA_NIM_API_KEY || "",
   aiProviderModel: process.env.AI_PROVIDER_MODEL || process.env.NVIDIA_NIM_MODEL || "z-ai/glm-5.1",
-  googleClientId: process.env.GOOGLE_CLIENT_ID || ""
+  googleClientId: process.env.GOOGLE_CLIENT_ID || "",
+  desktopAuthSecret: process.env.DESKTOP_AUTH_SECRET || ""
 };
 
 export const isSupabaseConfigured = () => Boolean(env.supabaseUrl && env.supabaseAnonKey);

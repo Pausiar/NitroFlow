@@ -2,13 +2,19 @@ import { SystemMonitor } from '../src/main/services/system-monitor'
 
 describe('SystemMonitor', () => {
   let monitor: SystemMonitor
+  let originalPlatform: PropertyDescriptor | undefined
 
   beforeEach(() => {
+    originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform')
+    Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
     monitor = new SystemMonitor()
   })
 
   afterEach(() => {
     monitor.stop()
+    if (originalPlatform) {
+      Object.defineProperty(process, 'platform', originalPlatform)
+    }
   })
 
   describe('getSnapshot', () => {

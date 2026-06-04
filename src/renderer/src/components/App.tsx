@@ -11,6 +11,7 @@ import { Optimizer } from './Optimizer/Optimizer'
 import { Settings } from './Settings/Settings'
 import { History } from './Layout/History'
 import { NotificationStack } from './Layout/NotificationStack'
+import { License } from './License/License'
 
 declare global {
   interface Window {
@@ -39,6 +40,8 @@ declare global {
       undoAction: (id: string) => Promise<unknown>
       getSettings: () => Promise<unknown>
       saveSettings: (s: unknown) => Promise<unknown>
+      verifyLicense: (token: string) => Promise<unknown>
+      logoutLicense: () => Promise<unknown>
       onActionComplete: (cb: (a: unknown) => void) => () => void
       onNotification: (cb: (n: unknown) => void) => () => void
     }
@@ -50,8 +53,22 @@ export function App() {
 
   useEffect(() => {
     // Load initial settings
-    window.electronAPI?.getSettings().then((s) => {
-      if (s) setSettings(s as never)
+    window.electronAPI?.getSettings().then(async (s) => {
+      if (!s) return
+
+      const settings = s as { licenseToken?: string }
+      setSettings(s as never)
+
+      if (settings.licenseToken) {
+        const status = await window.electronAPI?.verifyLicense(settings.licenseToken)
+        const refreshed = await window.electronAPI?.getSettings()
+        if (refreshed) setSettings(refreshed as never)
+
+        const result = status as { success?: boolean; error?: string } | null
+        if (result && !result.success) {
+          addNotification({ type: 'warning', message: result.error ?? 'Licencia caducada' })
+        }
+      }
     })
 
     // Subscribe to live metrics
@@ -91,6 +108,7 @@ export function App() {
       {currentPage === 'optimizer' && <Optimizer />}
       {currentPage === 'settings' && <Settings />}
       {currentPage === 'history' && <History />}
+      {currentPage === 'license' && <License />}
     </Layout>
   )
 }

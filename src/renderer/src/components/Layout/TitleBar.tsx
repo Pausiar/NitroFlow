@@ -9,7 +9,7 @@ export function TitleBar() {
     <div className="titlebar-drag flex items-center justify-between h-10 bg-fluent-bg border-b border-fluent-border px-4 flex-shrink-0 select-none">
       <div className="flex items-center gap-2">
         <BrandLogo size={20} />
-        <span className="text-xs text-fluent-textMuted ml-1">v1.0.2</span>
+        <span className="text-xs text-fluent-textMuted ml-1">v1.1.0</span>
       </div>
 
       <div className="titlebar-no-drag flex items-center gap-1">

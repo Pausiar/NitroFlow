@@ -162,6 +162,7 @@ export type ActionType =
 
 // ─── Optimizer ──────────────────────────────
 export type PerformanceMode = 'balanced' | 'performance' | 'gaming'
+export type LicensePlan = 'free' | 'pro'
 
 export interface OptimizerStatus {
   currentMode: PerformanceMode
@@ -187,6 +188,18 @@ export interface AppSettings {
   notifications: boolean
   startWithWindows: boolean
   performanceMode: PerformanceMode
+  webApiBaseUrl: string
+  licenseToken: string
+  licenseEmail: string
+  licensePlan: LicensePlan | null
+}
+
+export interface LicenseStatus {
+  success: boolean
+  licensed: boolean
+  plan: LicensePlan | null
+  email?: string
+  error?: string
 }
 
 // ─── IPC Channel Names ───────────────────────
@@ -225,6 +238,10 @@ export const IPC_CHANNELS = {
   // Settings
   GET_SETTINGS: 'settings:get',
   SAVE_SETTINGS: 'settings:save',
+
+  // Auth / licensing
+  VERIFY_LICENSE: 'auth:verify-license',
+  LOGOUT_LICENSE: 'auth:logout-license',
 
   // Optimizer
   OPTIMIZER_GET_STATUS: 'optimizer:get-status',

@@ -59,6 +59,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveSettings: (settings: unknown) =>
     ipcRenderer.invoke(IPC_CHANNELS.SAVE_SETTINGS, settings),
 
+  // Auth / licensing
+  verifyLicense: (token: string) => ipcRenderer.invoke(IPC_CHANNELS.VERIFY_LICENSE, token),
+  logoutLicense: () => ipcRenderer.invoke(IPC_CHANNELS.LOGOUT_LICENSE),
+
   // Events
   onActionComplete: (cb: (action: unknown) => void) => {
     const listener = (_: Electron.IpcRendererEvent, data: unknown) => cb(data)

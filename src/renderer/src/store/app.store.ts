@@ -10,10 +10,11 @@ import type {
   ActionHistory,
   AppSettings,
   PerformanceMode,
-  ProcessAIVerdict
+  ProcessAIVerdict,
+  LicensePlan
 } from '../../../shared/types'
 
-type Page = 'dashboard' | 'cleanup' | 'processes' | 'registry' | 'startup' | 'ai' | 'optimizer' | 'settings' | 'history'
+type Page = 'dashboard' | 'cleanup' | 'processes' | 'registry' | 'startup' | 'ai' | 'optimizer' | 'settings' | 'history' | 'license'
 
 interface Notification {
   id: string
@@ -116,7 +117,11 @@ export const useAppStore = create<AppState>((set) => ({
     language: 'es',
     notifications: true,
     startWithWindows: false,
-    performanceMode: 'balanced'
+    performanceMode: 'balanced',
+    webApiBaseUrl: 'https://web-tau-two-22.vercel.app',
+    licenseToken: '',
+    licenseEmail: '',
+    licensePlan: null as LicensePlan | null
   },
   setSettings: (settings) => set({ settings }),
 

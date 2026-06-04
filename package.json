@@ -1,6 +1,6 @@
 {
   "name": "nitroflow",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "NitroFlow – Intelligent Windows System Optimizer",
   "main": "out/main/index.js",
   "author": "NitroFlow",

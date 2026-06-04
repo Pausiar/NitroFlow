@@ -2,9 +2,18 @@ import { CleanupService, CLEANUP_CATEGORIES } from '../src/main/services/cleanup
 
 describe('CleanupService', () => {
   let service: CleanupService
+  let originalPlatform: PropertyDescriptor | undefined
 
   beforeEach(() => {
+    originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform')
+    Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
     service = new CleanupService()
+  })
+
+  afterEach(() => {
+    if (originalPlatform) {
+      Object.defineProperty(process, 'platform', originalPlatform)
+    }
   })
 
   describe('CLEANUP_CATEGORIES', () => {

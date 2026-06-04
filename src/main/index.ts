@@ -7,6 +7,10 @@ import { SystemMonitor } from './services/system-monitor'
 log.initialize({ preload: true })
 log.info('NitroFlow starting...')
 
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.nitroflow.app')
+}
+
 let mainWindow: BrowserWindow | null = null
 let systemMonitor: SystemMonitor | null = null
 
@@ -26,7 +30,7 @@ function createWindow(): void {
       contextIsolation: true,
       nodeIntegration: false
     },
-    icon: join(__dirname, '../../resources/icon.png')
+    icon: join(__dirname, '../../resources/icon.ico')
   })
 
   mainWindow.once('ready-to-show', () => {

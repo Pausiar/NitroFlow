@@ -2,10 +2,13 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServiceClient } from "@/lib/supabase-service";
 import { env } from "@/lib/env";
+import { verifyDesktopToken } from "@/lib/desktop-token";
+import type { Plan } from "@/lib/types";
 
 const schema = z.object({
-  googleToken: z.string().min(20).max(5000)
-});
+  googleToken: z.string().min(20).max(5000).optional(),
+  desktopToken: z.string().min(20).max(5000).optional()
+}).refine((value) => Boolean(value.googleToken || value.desktopToken));
 
 type TokenInfo = {
   email?: string;
@@ -23,7 +26,10 @@ const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 20;
 const rateLimit = new Map<string, RateLimitEntry>();
 
-const json = (body: { licensed: boolean }, status = 200) =>
+const json = (
+  body: { licensed: boolean; success?: boolean; plan?: Plan | null; email?: string; error?: string },
+  status = 200
+) =>
   NextResponse.json(body, {
     status,
     headers: {
@@ -81,9 +87,23 @@ export async function POST(request: Request) {
     return json({ licensed: false }, 400);
   }
 
+  if (payload.desktopToken) {
+    const token = verifyDesktopToken(payload.desktopToken);
+    if (!token) {
+      return json({ success: false, licensed: false, plan: null, error: "Token no valido" }, 401);
+    }
+
+    return json({
+      success: true,
+      licensed: token.plan === "pro",
+      plan: token.plan,
+      email: token.email
+    });
+  }
+
   try {
     const tokenInfoRes = await fetch(
-      `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(payload.googleToken)}`,
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(payload.googleToken ?? "")}`,
       { cache: "no-store" }
     );
 
@@ -107,8 +127,9 @@ export async function POST(request: Request) {
       return json({ licensed: false }, 503);
     }
 
-    return json({ licensed: profile?.plan === "pro" });
+    const plan = (profile?.plan ?? "free") as Plan;
+    return json({ success: true, licensed: plan === "pro", plan, email: tokenInfo.email });
   } catch {
-    return json({ licensed: false }, 503);
+    return json({ success: false, licensed: false, plan: null, error: "Servicio no disponible" }, 503);
   }
 }

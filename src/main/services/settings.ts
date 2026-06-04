@@ -4,6 +4,8 @@ import * as os from 'os'
 import log from 'electron-log'
 import type { AppSettings } from '../../shared/types'
 
+export const DEFAULT_WEB_API_BASE_URL = 'https://web-tau-two-22.vercel.app'
+
 const DEFAULT_SETTINGS: AppSettings = {
   nvidiaApiKey: '',
   aiModel: 'meta/llama3-8b-instruct',
@@ -14,7 +16,11 @@ const DEFAULT_SETTINGS: AppSettings = {
   language: 'es',
   notifications: true,
   startWithWindows: false,
-  performanceMode: 'balanced'
+  performanceMode: 'balanced',
+  webApiBaseUrl: DEFAULT_WEB_API_BASE_URL,
+  licenseToken: '',
+  licenseEmail: '',
+  licensePlan: null
 }
 
 export class SettingsService {
@@ -42,7 +48,11 @@ export class SettingsService {
 
   save(updates: Partial<AppSettings>): void {
     // Never store full API key in logs
-    const loggable = { ...updates, nvidiaApiKey: updates.nvidiaApiKey ? '***' : '' }
+    const loggable = {
+      ...updates,
+      nvidiaApiKey: updates.nvidiaApiKey ? '***' : '',
+      licenseToken: updates.licenseToken ? '***' : ''
+    }
     log.info('Saving settings:', loggable)
     this.settings = { ...this.settings, ...updates }
     try {

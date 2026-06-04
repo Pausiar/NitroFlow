@@ -43,12 +43,20 @@ export function Cleanup() {
       if (res) {
         setResults(res)
         const totalFreed = res.reduce((sum, r) => sum + r.freedMB, 0)
+        const cleanedIds = new Set(res.filter((r) => r.success).map((r) => r.categoryId))
+
+        setCleanupCategories(
+          cleanupCategories.map((cat) =>
+            cleanedIds.has(cat.id)
+              ? { ...cat, sizeMB: 0, fileCount: 0 }
+              : cat
+          )
+        )
+        setSelected((prev) => new Set([...prev].filter((id) => !cleanedIds.has(id))))
         addNotification({
           type: 'success',
           message: `Limpieza completada: ${totalFreed.toFixed(1)} MB liberados`
         })
-        // Re-scan
-        handleScan()
       }
     } catch (err) {
       addNotification({ type: 'error', message: 'Error en limpieza: ' + String(err) })

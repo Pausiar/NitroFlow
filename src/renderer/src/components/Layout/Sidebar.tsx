@@ -8,7 +8,8 @@ import {
   Bot,
   Zap,
   Settings,
-  Clock
+  Clock,
+  KeyRound
 } from 'lucide-react'
 import { BrandLogo } from './BrandLogo'
 
@@ -23,12 +24,14 @@ const navItems = [
 ] as const
 
 const bottomItems = [
+  { id: 'license', label: 'Licencia', icon: KeyRound },
   { id: 'history', label: 'Historial', icon: Clock },
   { id: 'settings', label: 'Ajustes', icon: Settings },
 ] as const
 
 export function Sidebar() {
-  const { currentPage, setPage } = useAppStore()
+  const { currentPage, setPage, settings } = useAppStore()
+  const planLabel = settings.licensePlan === 'pro' ? 'Pro activo' : settings.licensePlan === 'free' ? 'Free activo' : 'Sin iniciar sesion'
 
   return (
     <aside className="w-56 flex-shrink-0 bg-fluent-surface border-r border-fluent-border flex flex-col py-2">
@@ -67,7 +70,7 @@ export function Sidebar() {
 
         <div className="mt-3 px-3 py-2 rounded-fluent bg-fluent-card border border-fluent-border">
           <BrandLogo size={18} compact />
-          <p className="mt-1 text-[11px] text-fluent-textMuted">Desktop experience</p>
+          <p className="mt-1 text-[11px] text-fluent-textMuted">{planLabel}</p>
         </div>
       </div>
     </aside>

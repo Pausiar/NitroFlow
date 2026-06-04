@@ -7,6 +7,11 @@ import { SettingsService } from './settings'
 const POWER_PLAN_BALANCED = '381b4222-f694-41f0-9685-ff5bb260df2e'
 const POWER_PLAN_HIGH_PERFORMANCE = '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c'
 
+const setRegistryDword = (path: string, name: string, value: number | string) => `
+  if (-not (Test-Path '${path}')) { New-Item -Path '${path}' -Force | Out-Null }
+  New-ItemProperty -Path '${path}' -Name '${name}' -Value ${value} -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null
+`
+
 export class OptimizerService {
   private static instance: OptimizerService
 
@@ -64,13 +69,13 @@ export class OptimizerService {
 
     // Restore visual effects to default (let Windows decide)
     await runPowerShell(
-      `Set-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\VisualEffects' -Name VisualFXSetting -Value 0 -Type DWord -ErrorAction SilentlyContinue`,
+      setRegistryDword('HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\VisualEffects', 'VisualFXSetting', 0),
       5000
     )
 
     // Re-enable network throttling
     await runPowerShell(
-      `Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile' -Name NetworkThrottlingIndex -Value 10 -Type DWord -ErrorAction SilentlyContinue`,
+      setRegistryDword('HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile', 'NetworkThrottlingIndex', 10),
       5000
     )
 
@@ -88,8 +93,8 @@ export class OptimizerService {
     await runPowerShell(
       `$gamesPath = 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile\\Tasks\\Games'
        if (Test-Path $gamesPath) {
-         Set-ItemProperty -Path $gamesPath -Name Priority -Value 2 -Type DWord -ErrorAction SilentlyContinue
-         Set-ItemProperty -Path $gamesPath -Name 'Scheduling Category' -Value 'Medium' -Type String -ErrorAction SilentlyContinue
+         New-ItemProperty -Path $gamesPath -Name Priority -Value 2 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null
+         New-ItemProperty -Path $gamesPath -Name 'Scheduling Category' -Value 'Medium' -PropertyType String -Force -ErrorAction SilentlyContinue | Out-Null
        }`,
       5000
     )
@@ -108,7 +113,7 @@ export class OptimizerService {
 
     // Minimize visual effects for best performance
     await runPowerShell(
-      `Set-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\VisualEffects' -Name VisualFXSetting -Value 2 -Type DWord -ErrorAction SilentlyContinue`,
+      setRegistryDword('HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\VisualEffects', 'VisualFXSetting', 2),
       5000
     )
 
@@ -121,7 +126,7 @@ export class OptimizerService {
 
     // Disable background app CPU time limit
     await runPowerShell(
-      `Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile' -Name SystemResponsiveness -Value 0 -Type DWord -ErrorAction SilentlyContinue`,
+      setRegistryDword('HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile', 'SystemResponsiveness', 0),
       5000
     )
   }
@@ -136,8 +141,8 @@ export class OptimizerService {
     await runPowerShell(
       `$path = 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces'
        Get-ChildItem -Path $path -ErrorAction SilentlyContinue | ForEach-Object {
-         Set-ItemProperty -Path $_.PSPath -Name TcpAckFrequency -Value 1 -Type DWord -ErrorAction SilentlyContinue
-         Set-ItemProperty -Path $_.PSPath -Name TCPNoDelay -Value 1 -Type DWord -ErrorAction SilentlyContinue
+         New-ItemProperty -Path $_.PSPath -Name TcpAckFrequency -Value 1 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null
+         New-ItemProperty -Path $_.PSPath -Name TCPNoDelay -Value 1 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null
        }`,
       10000
     )
@@ -146,7 +151,7 @@ export class OptimizerService {
     // 0xffffffff is the maximum 32-bit unsigned int, which effectively disables
     // Windows' built-in network throttling index (default is 10 = ~10 Mbps cap).
     await runPowerShell(
-      `Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile' -Name NetworkThrottlingIndex -Value 0xffffffff -Type DWord -ErrorAction SilentlyContinue`,
+      setRegistryDword('HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile', 'NetworkThrottlingIndex', '0xffffffff'),
       5000
     )
 
@@ -154,27 +159,23 @@ export class OptimizerService {
     await runPowerShell(
       `$gamesPath = 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile\\Tasks\\Games'
        if (-not (Test-Path $gamesPath)) { New-Item -Path $gamesPath -Force | Out-Null }
-       Set-ItemProperty -Path $gamesPath -Name Priority -Value 6 -Type DWord -ErrorAction SilentlyContinue
-       Set-ItemProperty -Path $gamesPath -Name 'Scheduling Category' -Value 'High' -Type String -ErrorAction SilentlyContinue
-       Set-ItemProperty -Path $gamesPath -Name 'SFIO Priority' -Value 'High' -Type String -ErrorAction SilentlyContinue`,
+       New-ItemProperty -Path $gamesPath -Name Priority -Value 6 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null
+       New-ItemProperty -Path $gamesPath -Name 'Scheduling Category' -Value 'High' -PropertyType String -Force -ErrorAction SilentlyContinue | Out-Null
+       New-ItemProperty -Path $gamesPath -Name 'SFIO Priority' -Value 'High' -PropertyType String -Force -ErrorAction SilentlyContinue | Out-Null`,
       5000
     )
 
     // Enable Windows Game Mode
     await runPowerShell(
-      `$gameBarPath = 'HKCU:\\Software\\Microsoft\\GameBar'
-       if (-not (Test-Path $gameBarPath)) { New-Item -Path $gameBarPath -Force | Out-Null }
-       Set-ItemProperty -Path $gameBarPath -Name AllowAutoGameMode -Value 1 -Type DWord -ErrorAction SilentlyContinue
-       Set-ItemProperty -Path $gameBarPath -Name AutoGameModeEnabled -Value 1 -Type DWord -ErrorAction SilentlyContinue`,
+      `${setRegistryDword('HKCU:\\Software\\Microsoft\\GameBar', 'AllowAutoGameMode', 1)}
+       ${setRegistryDword('HKCU:\\Software\\Microsoft\\GameBar', 'AutoGameModeEnabled', 1)}`,
       5000
     )
 
     // Disable Xbox Game DVR background recording (frees GPU/RAM)
     await runPowerShell(
-      `$dvrPath = 'HKCU:\\System\\GameConfigStore'
-       if (-not (Test-Path $dvrPath)) { New-Item -Path $dvrPath -Force | Out-Null }
-       Set-ItemProperty -Path $dvrPath -Name GameDVR_Enabled -Value 0 -Type DWord -ErrorAction SilentlyContinue
-       Set-ItemProperty -Path $dvrPath -Name GameDVR_FSEBehaviorMode -Value 2 -Type DWord -ErrorAction SilentlyContinue`,
+      `${setRegistryDword('HKCU:\\System\\GameConfigStore', 'GameDVR_Enabled', 0)}
+       ${setRegistryDword('HKCU:\\System\\GameConfigStore', 'GameDVR_FSEBehaviorMode', 2)}`,
       5000
     )
   }

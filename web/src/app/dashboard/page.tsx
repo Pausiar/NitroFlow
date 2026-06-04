@@ -13,6 +13,7 @@ import { createClient as createServerSupabase } from "@/lib/supabase-server";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { BuyProButton } from "@/components/BuyProButton";
+import { createDesktopToken } from "@/lib/desktop-token";
 import type { Profile } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -69,6 +70,9 @@ export default async function DashboardPage() {
 
   const isPro = profile?.plan === "pro";
   const isAdmin = profile?.role === "admin";
+  const desktopToken = user.email
+    ? createDesktopToken({ email: user.email, plan: profile?.plan ?? "free" })
+    : "";
   const name =
     user.user_metadata?.full_name ||
     user.user_metadata?.name ||
@@ -158,12 +162,19 @@ export default async function DashboardPage() {
               Licencia para la app
             </div>
             <h2 className="mt-2 text-lg font-bold text-white">
-              {isPro ? "Activa" : "No disponible"}
+              {isPro ? "Pro activa" : "Free activa"}
             </h2>
             <p className="mt-2 text-sm text-[var(--color-text-muted)]">
-              Inicia sesion en NitroFlow Desktop con la misma cuenta de Google
-              (<span className="text-white">{user.email}</span>) y se activara
-              automaticamente.
+              Copia este token en NitroFlow Desktop para iniciar sesion con{" "}
+              <span className="text-white">{user.email}</span>.
+            </p>
+            <textarea
+              readOnly
+              value={desktopToken}
+              className="mt-3 h-24 w-full resize-none rounded-lg border border-[var(--color-border)] bg-black/30 p-3 font-mono text-xs text-white"
+            />
+            <p className="mt-2 text-xs text-[var(--color-text-muted)]">
+              Caduca en 30 dias. Si cambias de plan, vuelve a copiar un token nuevo.
             </p>
           </div>
         </div>

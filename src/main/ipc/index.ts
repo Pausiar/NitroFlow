@@ -10,6 +10,7 @@ import { AIService } from '../services/ai-service'
 import { HistoryService } from '../services/history'
 import { SettingsService } from '../services/settings'
 import { OptimizerService } from '../services/optimizer'
+import { AuthService } from '../services/auth'
 
 export function setupIpcHandlers(): void {
   const systemMonitor = new SystemMonitor()
@@ -21,6 +22,7 @@ export function setupIpcHandlers(): void {
   const historyService = HistoryService.getInstance()
   const settingsService = SettingsService.getInstance()
   const optimizerService = OptimizerService.getInstance()
+  const authService = new AuthService()
 
   // ── System Metrics ──────────────────────────────
   ipcMain.handle(IPC_CHANNELS.GET_METRICS, async () => {
@@ -266,5 +268,14 @@ export function setupIpcHandlers(): void {
       log.error('SAVE_SETTINGS error:', err)
       return { success: false, error: String(err) }
     }
+  })
+
+  // ── Auth / licensing ──────────────────────────────
+  ipcMain.handle(IPC_CHANNELS.VERIFY_LICENSE, async (_, token: string) => {
+    return authService.verifyLicense(token)
+  })
+
+  ipcMain.handle(IPC_CHANNELS.LOGOUT_LICENSE, () => {
+    return authService.logout()
   })
 }
