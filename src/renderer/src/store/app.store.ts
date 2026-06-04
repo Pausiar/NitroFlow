@@ -22,6 +22,19 @@ interface Notification {
   message: string
 }
 
+export interface ConfirmOptions {
+  title: string
+  description?: string
+  confirmLabel?: string
+  cancelLabel?: string
+  variant?: 'danger' | 'warning' | 'info'
+}
+
+interface ConfirmState extends ConfirmOptions {
+  id: string
+  resolve: (value: boolean) => void
+}
+
 interface AppState {
   // Navigation
   currentPage: Page
@@ -77,6 +90,11 @@ interface AppState {
 
   loading: Record<string, boolean>
   setLoading: (key: string, value: boolean) => void
+
+  // Styled confirmation dialog
+  confirmDialog: ConfirmState | null
+  requestConfirm: (options: ConfirmOptions) => Promise<boolean>
+  resolveConfirm: (value: boolean) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -146,5 +164,18 @@ export const useAppStore = create<AppState>((set) => ({
 
   loading: {},
   setLoading: (key, value) =>
-    set((state) => ({ loading: { ...state.loading, [key]: value } }))
+    set((state) => ({ loading: { ...state.loading, [key]: value } })),
+
+  confirmDialog: null,
+  requestConfirm: (options) =>
+    new Promise<boolean>((resolve) => {
+      set({
+        confirmDialog: { ...options, id: `${Date.now()}-${Math.random()}`, resolve }
+      })
+    }),
+  resolveConfirm: (value) =>
+    set((state) => {
+      state.confirmDialog?.resolve(value)
+      return { confirmDialog: null }
+    })
 }))

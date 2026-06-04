@@ -1,7 +1,7 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import log from 'electron-log'
-import { runPowerShell } from '../utils/powershell'
+import { runPowerShell, runPowerShellResult } from '../utils/powershell'
 import { isPathSafe } from '../utils/security'
 import type { CleanupCategory, CleanupResult } from '../../shared/types'
 
@@ -121,14 +121,26 @@ export class CleanupService {
     const errors: string[] = []
     let freedMB = 0
     let deletedFiles = 0
+    let requiresAdmin = false
+    let hadContent = false
 
     if (cat.id === 'recycle_bin') {
-      try {
-        await runPowerShell('Clear-RecycleBin -Force -ErrorAction SilentlyContinue')
-      } catch (err) {
-        errors.push(String(err))
+      const { stderr } = await runPowerShellResult(
+        'Clear-RecycleBin -Force -ErrorAction SilentlyContinue',
+        15000
+      )
+      if (stderr && !/no items|vacía|empty/i.test(stderr)) {
+        if (this.isAccessDenied(stderr)) requiresAdmin = true
+        else errors.push(this.humanizeError('Papelera de reciclaje', stderr))
       }
-      return { categoryId: cat.id, freedMB: 0, deletedFiles: 0, errors, success: errors.length === 0 }
+      return {
+        categoryId: cat.id,
+        freedMB: 0,
+        deletedFiles: 0,
+        errors,
+        success: errors.length === 0,
+        requiresAdmin
+      }
     }
 
     for (const rawPath of cat.paths) {
@@ -137,14 +149,25 @@ export class CleanupService {
         errors.push(`Ruta protegida omitida: ${expandedPath}`)
         continue
       }
+      if (!fs.existsSync(expandedPath)) {
+        // Missing path is not an error — simply nothing to clean here.
+        continue
+      }
       try {
         const before = await this.getDirSize(expandedPath)
-        await this.deleteContents(expandedPath)
+        if (before.fileCount > 0 || before.sizeMB > 0) hadContent = true
+        const stderr = await this.deleteContents(expandedPath)
+        if (stderr) {
+          if (this.isAccessDenied(stderr)) requiresAdmin = true
+          else errors.push(this.humanizeError(expandedPath, stderr))
+        }
         const after = await this.getDirSize(expandedPath)
         freedMB += before.sizeMB - after.sizeMB
         deletedFiles += before.fileCount - after.fileCount
       } catch (err) {
-        errors.push(`Error en ${expandedPath}: ${String(err)}`)
+        const msg = String(err)
+        if (this.isAccessDenied(msg)) requiresAdmin = true
+        else errors.push(this.humanizeError(expandedPath, msg))
       }
     }
 
@@ -153,19 +176,39 @@ export class CleanupService {
       freedMB: Math.max(0, Math.round(freedMB * 10) / 10),
       deletedFiles: Math.max(0, deletedFiles),
       errors,
-      success: errors.length === 0
+      // A category with no content and no hard errors is a success (0 files),
+      // not a failure. Admin-only locked content is reported separately.
+      success: errors.length === 0,
+      requiresAdmin: requiresAdmin || undefined,
+      empty: !hadContent && errors.length === 0 && !requiresAdmin ? true : undefined
     }
   }
 
-  private async deleteContents(dirPath: string): Promise<void> {
-    if (!fs.existsSync(dirPath)) return
-    // Use single-quoted path inside the script — no user input, expandPath is our own logic
+  private isAccessDenied(message: string): boolean {
+    return /access.*denied|acceso.*denegado|UnauthorizedAccess|PermissionDenied|denied/i.test(
+      message
+    )
+  }
+
+  private humanizeError(target: string, raw: string): string {
+    // Keep technical detail in logs, show a concise message to the user.
+    log.warn(`Cleanup error on ${target}: ${raw}`)
+    if (/in use|being used|siendo utilizado|bloque/i.test(raw)) {
+      return `Algunos archivos estaban en uso y no se pudieron eliminar.`
+    }
+    return `No se pudieron eliminar algunos archivos.`
+  }
+
+  private async deleteContents(dirPath: string): Promise<string> {
+    if (!fs.existsSync(dirPath)) return ''
+    // Single-quoted path inside the script — no user input, expandPath is our own logic
     const safePath = dirPath.replace(/'/g, "''")
     const ps = `
       Get-ChildItem -Path '${safePath}' -Force -ErrorAction SilentlyContinue |
       Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
     `
-    await runPowerShell(ps, 30000)
+    const { stderr } = await runPowerShellResult(ps, 30000)
+    return stderr
   }
 
   private async getDirSize(dirPath: string): Promise<{ sizeMB: number; fileCount: number }> {
@@ -177,13 +220,24 @@ export class CleanupService {
       $countRaw = ($items | Where-Object { !$_.PSIsContainer } | Measure-Object).Count
       $size = if ($sizeRaw -ne $null) { [long]$sizeRaw } else { 0L }
       $count = if ($countRaw -ne $null) { [int]$countRaw } else { 0 }
-      [PSCustomObject]@{ Size = $size; Count = $count } | ConvertTo-Json
+      [PSCustomObject]@{ Size = $size; Count = $count } | ConvertTo-Json -Compress
     `
     const stdout = await runPowerShell(ps, 15000)
-    const data = JSON.parse(stdout)
+    const data = this.safeParse(stdout)
     return {
       sizeMB: Math.round((Number(data.Size ?? 0) / (1024 * 1024)) * 10) / 10,
       fileCount: Number(data.Count ?? 0)
+    }
+  }
+
+  private safeParse(stdout: string): { Size?: number; Count?: number } {
+    const trimmed = (stdout ?? '').trim()
+    if (!trimmed) return { Size: 0, Count: 0 }
+    try {
+      return JSON.parse(trimmed)
+    } catch {
+      log.warn('Cleanup: could not parse PowerShell size output')
+      return { Size: 0, Count: 0 }
     }
   }
 
@@ -194,10 +248,10 @@ export class CleanupService {
         $bin = $shell.Namespace(0xa)
         $size = 0; $count = 0
         foreach ($item in $bin.Items()) { $size += $item.Size; $count++ }
-        [PSCustomObject]@{ Size = $size; Count = $count } | ConvertTo-Json
+        [PSCustomObject]@{ Size = $size; Count = $count } | ConvertTo-Json -Compress
       `
       const stdout = await runPowerShell(ps, 10000)
-      const data = JSON.parse(stdout)
+      const data = this.safeParse(stdout)
       return {
         sizeMB: Math.round((Number(data.Size ?? 0) / (1024 * 1024)) * 10) / 10,
         fileCount: Number(data.Count ?? 0)

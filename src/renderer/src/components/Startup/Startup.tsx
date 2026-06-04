@@ -4,7 +4,7 @@ import { RefreshCw, Rocket, AlertTriangle, CheckCircle } from 'lucide-react'
 import type { StartupEntry } from '../../../../shared/types'
 
 export function Startup() {
-  const { startupEntries, setStartupEntries, addNotification, setLoading, loading } = useAppStore()
+  const { startupEntries, setStartupEntries, addNotification, setLoading, loading, requestConfirm } = useAppStore()
   const [filter, setFilter] = useState('')
 
   const isLoading = loading['startup']
@@ -26,7 +26,12 @@ export function Startup() {
     if (!entry) return
 
     const action = enabled ? 'habilitar' : 'deshabilitar'
-    const confirmed = window.confirm(`¿${action} el programa de inicio "${entry.name}"?`)
+    const confirmed = await requestConfirm({
+      title: `¿Deseas ${action} este programa?`,
+      description: `Programa de inicio: "${entry.name}".`,
+      confirmLabel: enabled ? 'Habilitar' : 'Deshabilitar',
+      variant: 'info'
+    })
     if (!confirmed) return
 
     const result = await window.electronAPI?.toggleStartup(id, enabled) as { success: boolean; error?: string }

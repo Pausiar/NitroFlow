@@ -4,7 +4,7 @@ import { Search, Trash2, AlertTriangle, Database } from 'lucide-react'
 import type { RegistryEntry } from '../../../../shared/types'
 
 export function Registry() {
-  const { registryEntries, setRegistryEntries, addNotification, setLoading, loading } = useAppStore()
+  const { registryEntries, setRegistryEntries, addNotification, setLoading, loading, requestConfirm } = useAppStore()
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [hasScanned, setHasScanned] = useState(false)
 
@@ -31,9 +31,12 @@ export function Registry() {
 
   const handleClean = async () => {
     if (selected.size === 0) return
-    const confirmed = window.confirm(
-      `¿Limpiar ${selected.size} entradas del registro? Se creará una copia de seguridad automáticamente antes de proceder.`
-    )
+    const confirmed = await requestConfirm({
+      title: 'Limpiar entradas del registro',
+      description: `Se limpiarán ${selected.size} entradas del registro. Se creará una copia de seguridad automáticamente antes de proceder.`,
+      confirmLabel: 'Limpiar registro',
+      variant: 'warning'
+    })
     if (!confirmed) return
 
     setLoading('registry-clean', true)

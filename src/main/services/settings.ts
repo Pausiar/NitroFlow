@@ -8,7 +8,7 @@ export const DEFAULT_WEB_API_BASE_URL = 'https://web-tau-two-22.vercel.app'
 
 const DEFAULT_SETTINGS: AppSettings = {
   nvidiaApiKey: '',
-  aiModel: 'meta/llama3-8b-instruct',
+  aiModel: 'meta/llama-3.1-8b-instruct',
   optimizationProfile: 'quick',
   autoMonitor: true,
   monitorIntervalSeconds: 3,

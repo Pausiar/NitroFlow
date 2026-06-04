@@ -103,11 +103,20 @@ export class OptimizerService {
   // ── Performance ─────────────────────────────────────────────────────────────
 
   private async applyPerformance(): Promise<void> {
-    // Activate High Performance power plan (create if missing)
+    // Activate High Performance power plan. On systems where the built-in
+    // plan is missing (common on modern laptops), `powercfg /duplicatescheme`
+    // creates a copy with a BRAND NEW GUID — so we must capture and activate
+    // that GUID instead of the original one (which would fail).
     await runPowerShell(
-      `$plan = powercfg /list | Select-String '${POWER_PLAN_HIGH_PERFORMANCE}'
-       if (-not $plan) { powercfg /duplicatescheme ${POWER_PLAN_HIGH_PERFORMANCE} }
-       powercfg /setactive ${POWER_PLAN_HIGH_PERFORMANCE}`,
+      `$hp = '${POWER_PLAN_HIGH_PERFORMANCE}'
+       $existing = powercfg /list | Select-String $hp
+       if ($existing) {
+         powercfg /setactive $hp
+       } else {
+         $dup = powercfg /duplicatescheme $hp 2>$null
+         $match = [regex]::Match(($dup -join ' '), '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}')
+         if ($match.Success) { powercfg /setactive $match.Value } else { powercfg /setactive $hp }
+       }`,
       10000
     )
 
@@ -147,11 +156,13 @@ export class OptimizerService {
       10000
     )
 
-    // Disable network throttling (removes bandwidth cap on game traffic)
-    // 0xffffffff is the maximum 32-bit unsigned int, which effectively disables
+    // Disable network throttling (removes bandwidth cap on game traffic).
+    // 4294967295 (0xffffffff) is the max 32-bit unsigned int, which disables
     // Windows' built-in network throttling index (default is 10 = ~10 Mbps cap).
+    // It is passed as a decimal so Windows PowerShell parses it as a DWord
+    // instead of mis-parsing the 0x literal as Int32 (-1).
     await runPowerShell(
-      setRegistryDword('HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile', 'NetworkThrottlingIndex', '0xffffffff'),
+      setRegistryDword('HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile', 'NetworkThrottlingIndex', 4294967295),
       5000
     )
 

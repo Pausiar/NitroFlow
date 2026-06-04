@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useAppStore } from '../../store/app.store'
-import { Trash2, Search, CheckCircle2, XCircle } from 'lucide-react'
+import { Trash2, Search, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react'
 import type { CleanupCategory, CleanupResult } from '../../../../shared/types'
 
 export function Cleanup() {
-  const { cleanupCategories, setCleanupCategories, addNotification, setLoading, loading } = useAppStore()
+  const { cleanupCategories, setCleanupCategories, addNotification, setLoading, loading, requestConfirm } = useAppStore()
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [results, setResults] = useState<CleanupResult[]>([])
   const [hasScanned, setHasScanned] = useState(false)
@@ -32,9 +32,13 @@ export function Cleanup() {
 
   const handleClean = async () => {
     if (selected.size === 0) return
-    const confirmed = window.confirm(
-      `¿Deseas limpiar ${selected.size} categorías seleccionadas? Esta acción no se puede deshacer.`
-    )
+    const confirmed = await requestConfirm({
+      title: 'Confirmar limpieza',
+      description: `Se limpiarán ${selected.size} categorías seleccionadas. Esta acción no se puede deshacer.`,
+      confirmLabel: 'Limpiar ahora',
+      cancelLabel: 'Cancelar',
+      variant: 'warning'
+    })
     if (!confirmed) return
 
     setLoading('cleanup-run', true)
@@ -53,6 +57,13 @@ export function Cleanup() {
           )
         )
         setSelected((prev) => new Set([...prev].filter((id) => !cleanedIds.has(id))))
+
+        if (res.some((r) => r.requiresAdmin)) {
+          addNotification({
+            type: 'warning',
+            message: 'Algunas categorías requieren ejecutar NitroFlow como administrador.'
+          })
+        }
         addNotification({
           type: 'success',
           message: `Limpieza completada: ${totalFreed.toFixed(1)} MB liberados`
@@ -191,12 +202,38 @@ function CategoryCard({
             {category.sizeMB.toFixed(1)} MB
           </span>
           <span className="text-xs text-fluent-textMuted">{category.fileCount} archivos</span>
-          {result && (
-            <span className={`flex items-center gap-1 text-xs ${result.success ? 'text-fluent-success' : 'text-fluent-error'}`}>
-              {result.success ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
-              {result.success ? `−${result.freedMB.toFixed(1)} MB` : 'Error'}
-            </span>
-          )}
+          {result && (() => {
+            if (result.requiresAdmin) {
+              return (
+                <span className="flex items-center gap-1 text-xs text-fluent-warning">
+                  <AlertTriangle size={12} />
+                  Requiere admin
+                </span>
+              )
+            }
+            if (!result.success) {
+              return (
+                <span className="flex items-center gap-1 text-xs text-fluent-error">
+                  <XCircle size={12} />
+                  {result.errors[0] ?? 'Error'}
+                </span>
+              )
+            }
+            if (result.empty) {
+              return (
+                <span className="flex items-center gap-1 text-xs text-fluent-textMuted">
+                  <CheckCircle2 size={12} />
+                  Sin archivos
+                </span>
+              )
+            }
+            return (
+              <span className="flex items-center gap-1 text-xs text-fluent-success">
+                <CheckCircle2 size={12} />
+                {`−${result.freedMB.toFixed(1)} MB`}
+              </span>
+            )
+          })()}
         </div>
       </div>
     </div>

@@ -101,6 +101,10 @@ export interface CleanupResult {
   deletedFiles: number
   errors: string[]
   success: boolean
+  /** True when the category could not be fully cleaned due to missing admin rights. */
+  requiresAdmin?: boolean
+  /** True when the category had nothing to clean (not an error). */
+  empty?: boolean
 }
 
 // ─── Registry ───────────────────────────────

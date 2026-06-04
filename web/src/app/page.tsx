@@ -298,7 +298,7 @@ export default function HomePage() {
               <div className="flex items-center justify-between">
                 <p className="font-semibold text-white">Asistente IA</p>
                 <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-accent-soft)] px-2 py-0.5 text-[10px] uppercase tracking-wide text-[var(--color-info)]">
-                  <Bot size={10} /> NIM
+                  <Bot size={10} /> IA
                 </span>
               </div>
               <div className="mt-4 space-y-3 text-sm">

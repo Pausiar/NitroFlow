@@ -12,7 +12,7 @@ export function Processes() {
   const {
     processes, services, setProcesses, setServices,
     processAIVerdicts, setProcessAIVerdicts,
-    addNotification, setLoading, loading
+    addNotification, setLoading, loading, requestConfirm
   } = useAppStore()
   const [tab, setTab] = useState<'processes' | 'services'>('processes')
   const [filter, setFilter] = useState('')
@@ -38,7 +38,12 @@ export function Processes() {
   useEffect(() => { refresh() }, [tab])
 
   const handleKill = async (pid: number, name: string) => {
-    const confirmed = window.confirm(`¿Terminar el proceso "${name}" (PID ${pid})?`)
+    const confirmed = await requestConfirm({
+      title: '¿Terminar proceso?',
+      description: `Se terminará el proceso "${name}" (PID ${pid}). Los datos no guardados podrían perderse.`,
+      confirmLabel: 'Terminar',
+      variant: 'danger'
+    })
     if (!confirmed) return
     const result = await window.electronAPI?.killProcess(pid) as { success: boolean; error?: string }
     if (result?.success) {
@@ -51,7 +56,12 @@ export function Processes() {
 
   const handleService = async (name: string, action: 'start' | 'stop' | 'disable') => {
     const labels = { start: 'iniciar', stop: 'detener', disable: 'deshabilitar' }
-    const confirmed = window.confirm(`¿${labels[action]} el servicio "${name}"?`)
+    const confirmed = await requestConfirm({
+      title: `¿Deseas ${labels[action]} el servicio?`,
+      description: `Servicio: "${name}".`,
+      confirmLabel: labels[action].charAt(0).toUpperCase() + labels[action].slice(1),
+      variant: action === 'disable' ? 'danger' : 'info'
+    })
     if (!confirmed) return
     const result = await window.electronAPI?.setService(name, action) as { success: boolean; error?: string }
     if (result?.success) {
@@ -89,9 +99,12 @@ export function Processes() {
   const handleKillAllDisposable = async () => {
     const disposable = processAIVerdicts.filter((v) => v.verdict === 'disposable')
     if (!disposable.length) return
-    const confirmed = window.confirm(
-      `¿Terminar ${disposable.length} ${pl(disposable.length, 'proceso marcado', 'procesos marcados')} como ${pl(disposable.length, 'prescindible', 'prescindibles')}?`
-    )
+    const confirmed = await requestConfirm({
+      title: '¿Terminar procesos prescindibles?',
+      description: `Se terminarán ${disposable.length} ${pl(disposable.length, 'proceso marcado', 'procesos marcados')} como ${pl(disposable.length, 'prescindible', 'prescindibles')}.`,
+      confirmLabel: 'Terminar todos',
+      variant: 'danger'
+    })
     if (!confirmed) return
 
     let killed = 0

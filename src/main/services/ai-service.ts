@@ -2,10 +2,73 @@ import axios from 'axios'
 import log from 'electron-log'
 import type { ChatMessage, SystemContext, ProcessInfo, ProcessAIVerdict } from '../../shared/types'
 
-const NVIDIA_NIM_BASE_URL = 'https://integrate.api.nvidia.com/v1'
+const NVIDIA_NIM_BASE_URL = (
+  process.env.NVIDIA_NIM_BASE_URL || 'https://integrate.api.nvidia.com/v1'
+).replace(/\/+$/, '')
 const DEFAULT_MODEL = 'meta/llama-3.1-8b-instruct'
+// If the configured model is rejected (404 / unknown model), transparently
+// fall back to these known-good NVIDIA NIM models, in order.
+const FALLBACK_MODELS = [
+  'meta/llama-3.1-8b-instruct',
+  'meta/llama3-8b-instruct',
+  'mistralai/mistral-7b-instruct-v0.3'
+]
+
+interface NimMessage {
+  role: 'system' | 'user' | 'assistant'
+  content: string
+}
+
+interface NimOptions {
+  temperature?: number
+  maxTokens?: number
+  timeout?: number
+}
 
 export class AIService {
+  /**
+   * Call the NVIDIA NIM (OpenAI-compatible) chat completions endpoint with
+   * automatic model fallback. Throws a clean Error on failure so callers can
+   * degrade to offline mode.
+   */
+  private async createChatCompletion(
+    messages: NimMessage[],
+    apiKey: string,
+    model: string,
+    options: NimOptions = {}
+  ): Promise<string> {
+    const { temperature = 0.4, maxTokens = 1024, timeout = 30000 } = options
+    const candidates = Array.from(new Set([model || DEFAULT_MODEL, ...FALLBACK_MODELS].filter(Boolean)))
+
+    let lastError: unknown = null
+    for (const candidate of candidates) {
+      try {
+        const response = await axios.post(
+          `${NVIDIA_NIM_BASE_URL}/chat/completions`,
+          { model: candidate, messages, temperature, max_tokens: maxTokens, stream: false },
+          {
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+              'Content-Type': 'application/json',
+              Accept: 'application/json'
+            },
+            timeout
+          }
+        )
+        return response.data?.choices?.[0]?.message?.content ?? ''
+      } catch (err) {
+        lastError = err
+        // Only fall back when the model itself is the problem (404 / 400 /
+        // 422 "model not found"). Auth (401/403) and network errors are fatal.
+        const status = axios.isAxiosError(err) ? err.response?.status : undefined
+        if (status === 401 || status === 403) break
+        if (status !== 404 && status !== 400 && status !== 422) break
+        log.warn(`AIService: model "${candidate}" rejected (HTTP ${status}), trying fallback`)
+      }
+    }
+    throw lastError instanceof Error ? lastError : new Error(String(lastError))
+  }
+
   async chat(
     messages: ChatMessage[],
     systemContext: SystemContext,
@@ -21,32 +84,21 @@ export class AIService {
 
     try {
       const systemPrompt = this.buildSystemPrompt(systemContext)
-      const payload = {
-        model,
-        messages: [
+      const content = await this.createChatCompletion(
+        [
           { role: 'system', content: systemPrompt },
           ...messages
             .filter((m) => m.role !== 'system')
-            .map((m) => ({ role: m.role, content: m.content }))
+            .map((m) => ({ role: m.role as NimMessage['role'], content: m.content }))
         ],
-        temperature: 0.4,
-        max_tokens: 1024,
-        stream: false
-      }
-
-      const response = await axios.post(`${NVIDIA_NIM_BASE_URL}/chat/completions`, payload, {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        },
-        timeout: 30000
-      })
-
-      const content = response.data?.choices?.[0]?.message?.content ?? ''
+        apiKey,
+        model,
+        { temperature: 0.4, maxTokens: 1024 }
+      )
       return { content }
     } catch (err) {
       log.error('AI chat error:', err)
-      const errorMsg = axios.isAxiosError(err) ? err.message : String(err)
+      const errorMsg = this.describeError(err)
       return {
         content: `⚠️ No se pudo conectar con el servicio de IA: ${errorMsg}`,
         error: errorMsg
@@ -65,31 +117,19 @@ export class AIService {
 
     try {
       const prompt = this.buildAnalysisPrompt(systemContext)
-      const response = await axios.post(
-        `${NVIDIA_NIM_BASE_URL}/chat/completions`,
-        {
-          model,
-          messages: [
-            {
-              role: 'system',
-              content: 'Eres un experto en optimización de sistemas Windows. Responde SIEMPRE en español. Sé conciso y práctico.'
-            },
-            { role: 'user', content: prompt }
-          ],
-          temperature: 0.3,
-          max_tokens: 1024,
-          stream: false
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            'Content-Type': 'application/json'
+      const raw = await this.createChatCompletion(
+        [
+          {
+            role: 'system',
+            content:
+              'Eres un experto en optimización de sistemas Windows. Responde SIEMPRE en español. Sé conciso y práctico.'
           },
-          timeout: 30000
-        }
+          { role: 'user', content: prompt }
+        ],
+        apiKey,
+        model,
+        { temperature: 0.3, maxTokens: 1024 }
       )
-
-      const raw = response.data?.choices?.[0]?.message?.content ?? ''
       return this.parseAnalysisResponse(raw)
     } catch (err) {
       log.error('AI analyze error:', err)
@@ -131,41 +171,44 @@ Responde EXACTAMENTE con este formato JSON (sin texto extra):
 ]`
 
     try {
-      const response = await axios.post(
-        `${NVIDIA_NIM_BASE_URL}/chat/completions`,
-        {
-          model,
-          messages: [
-            {
-              role: 'system',
-              content:
-                'Eres un experto en optimización de sistemas Windows. Responde SIEMPRE en JSON válido.'
-            },
-            { role: 'user', content: prompt }
-          ],
-          temperature: 0.2,
-          max_tokens: 2048,
-          stream: false
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            'Content-Type': 'application/json'
+      const raw = await this.createChatCompletion(
+        [
+          {
+            role: 'system',
+            content: 'Eres un experto en optimización de sistemas Windows. Responde SIEMPRE en JSON válido.'
           },
-          timeout: 45000
-        }
+          { role: 'user', content: prompt }
+        ],
+        apiKey,
+        model,
+        { temperature: 0.2, maxTokens: 2048, timeout: 45000 }
       )
-
-      const raw = response.data?.choices?.[0]?.message?.content ?? ''
       const verdicts = this.parseProcessVerdicts(raw, top)
       return { verdicts }
     } catch (err) {
       log.error('AI analyzeProcesses error:', err)
       return {
         verdicts: this.getOfflineProcessVerdicts(top),
-        error: axios.isAxiosError(err) ? err.message : String(err)
+        error: this.describeError(err)
       }
     }
+  }
+
+  private describeError(err: unknown): string {
+    if (axios.isAxiosError(err)) {
+      const status = err.response?.status
+      if (status === 401 || status === 403) {
+        return 'API key de IA no válida o sin permisos'
+      }
+      if (status === 429) {
+        return 'Límite de peticiones alcanzado, inténtalo más tarde'
+      }
+      if (err.code === 'ECONNABORTED') {
+        return 'Tiempo de espera agotado'
+      }
+      return err.message
+    }
+    return String(err)
   }
 
   private parseProcessVerdicts(raw: string, processes: ProcessInfo[]): ProcessAIVerdict[] {
