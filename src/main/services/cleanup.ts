@@ -66,15 +66,28 @@ export const CLEANUP_CATEGORIES: Omit<CleanupCategory, 'sizeMB' | 'fileCount'>[]
 
 export class CleanupService {
   async scan(): Promise<CleanupCategory[]> {
-    const results: CleanupCategory[] = []
-    for (const cat of CLEANUP_CATEGORIES) {
+    const measure = async (
+      cat: (typeof CLEANUP_CATEGORIES)[number]
+    ): Promise<CleanupCategory> => {
       if (process.platform !== 'win32') {
-        results.push({ ...cat, sizeMB: Math.random() * 500, fileCount: Math.floor(Math.random() * 1000) })
-        continue
+        return { ...cat, sizeMB: Math.random() * 500, fileCount: Math.floor(Math.random() * 1000) }
       }
       const { sizeMB, fileCount } = await this.measureCategory(cat)
-      results.push({ ...cat, sizeMB, fileCount })
+      return { ...cat, sizeMB, fileCount }
     }
+
+    // Each Windows measurement spawns PowerShell and walks a directory tree.
+    // Running them one after another made the scan take the sum of all of
+    // them; a small pool keeps it fast without launching 8 shells at once.
+    const results: CleanupCategory[] = new Array(CLEANUP_CATEGORIES.length)
+    let next = 0
+    const worker = async (): Promise<void> => {
+      while (next < CLEANUP_CATEGORIES.length) {
+        const index = next++
+        results[index] = await measure(CLEANUP_CATEGORIES[index])
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(3, CLEANUP_CATEGORIES.length) }, worker))
     return results
   }
 
@@ -222,7 +235,7 @@ export class CleanupService {
       $count = if ($countRaw -ne $null) { [int]$countRaw } else { 0 }
       [PSCustomObject]@{ Size = $size; Count = $count } | ConvertTo-Json -Compress
     `
-    const stdout = await runPowerShell(ps, 15000)
+    const stdout = await runPowerShell(ps, 45000)
     const data = this.safeParse(stdout)
     return {
       sizeMB: Math.round((Number(data.Size ?? 0) / (1024 * 1024)) * 10) / 10,

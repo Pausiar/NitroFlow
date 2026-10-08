@@ -10,6 +10,9 @@ export interface PowerShellResult {
   ok: boolean
 }
 
+/** Signature of {@link runPowerShellResult}; services accept it so tests can inject a fake. */
+export type PowerShellRunner = (script: string, timeoutMs?: number) => Promise<PowerShellResult>
+
 /**
  * Run a PowerShell script and always resolve (never reject) with the
  * captured stdout/stderr. The user script is wrapped so that:

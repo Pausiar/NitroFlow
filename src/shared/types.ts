@@ -153,8 +153,17 @@ export interface ActionHistory {
   details: string
   reversible: boolean
   undone: boolean
+  /** Registry backups: a folder of .reg files (or a single legacy .reg file). */
   backupPath?: string
+  /** What to execute to revert this action (startup / service / optimizer). */
+  undo?: UndoPayload
 }
+
+/** Data needed to revert an action, so "Deshacer" really does something. */
+export type UndoPayload =
+  | { kind: 'startup'; id: string; enabled: boolean }
+  | { kind: 'service'; name: string; action: 'start' | 'stop' }
+  | { kind: 'optimizer'; mode: PerformanceMode }
 
 export type ActionType =
   | 'cleanup'

@@ -64,7 +64,10 @@ NitroFlow/
 │   │   │   ├── history.ts          # Action history & undo
 │   │   │   └── settings.ts         # App settings
 │   │   └── utils/
-│   │       └── security.ts         # Path/registry protection
+│   │       ├── security.ts         # Path/registry/process protection, AI anonymization
+│   │       ├── powershell.ts       # PowerShell runner
+│   │       ├── ps-errors.ts        # Friendly PowerShell error messages
+│   │       └── settings-validation.ts  # Whitelist for settings coming from the UI
 │   ├── preload/              # Context bridge (IPC exposure)
 │   ├── renderer/             # React frontend
 │   │   └── src/
@@ -86,11 +89,14 @@ NitroFlow is built with a safety-first approach:
 
 - **Protected paths**: System32, SysWOW64, WinSxS, user Documents/Pictures/Music/Videos are never touched
 - **Protected registry keys**: SYSTEM, SAM, Security, Winlogon, Policies keys are read-only
-- **Protected processes**: Critical OS processes (lsass.exe, csrss.exe, winlogon.exe, etc.) cannot be terminated
-- **Registry backups**: Automatic `.reg` export before any registry modification
+- **Protected processes**: Critical OS processes (lsass, csrss, winlogon, svchost, etc.) cannot be terminated; matching ignores the `.exe` suffix because Windows reports names without it
+- **Protected services**: Critical services (Defender, Windows Update, RPC, Event Log, ...) cannot be stopped or disabled, enforced in the main process and not only in the UI
+- **Registry backups**: Only the keys about to be modified are exported (one `.reg` per key, in `~/NitroFlow/registry-backups/backup-<timestamp>/`). If the backup fails, nothing is changed
+- **Real results**: Operations report PowerShell failures (for example "access denied, run as administrator") instead of claiming success
+- **Undo**: Registry cleanups, startup toggles, service start/stop and performance modes can be reverted from the History page
 - **User confirmation**: Required before every irreversible action
 - **AI never executes**: The AI module only analyzes and recommends — the user approves each action
-- **Data anonymization**: Personal paths, usernames, IPs, and MAC addresses are stripped before sending to NVIDIA NIM
+- **Data anonymization**: Personal paths, usernames, computer names, IPs, and MAC addresses are stripped from every message before it is sent to NVIDIA NIM
 
 ---
 

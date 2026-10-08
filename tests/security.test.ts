@@ -1,4 +1,13 @@
-import { isPathSafe, anonymizeForAI, PROTECTED_PROCESSES, PROTECTED_REGISTRY_KEYS } from '../src/main/utils/security'
+import {
+  isPathSafe,
+  anonymizeForAI,
+  anonymizeText,
+  isProcessProtected,
+  isRegistryKeyProtected,
+  normalizeRegistryKey,
+  PROTECTED_PROCESSES,
+  PROTECTED_REGISTRY_KEYS
+} from '../src/main/utils/security'
 
 describe('Security Utils', () => {
   describe('isPathSafe', () => {
@@ -111,6 +120,96 @@ describe('Security Utils', () => {
       const result = anonymizeForAI(data)
       expect(result.cpuPercent).toBe(45)
       expect(result.ramMB).toBe(8192)
+    })
+  })
+
+  describe('isPathSafe (segment boundaries)', () => {
+    it('blocks a personal folder itself, not only files inside it', () => {
+      expect(isPathSafe('C:\\Users\\John\\Documents')).toBe(false)
+    })
+
+    it('does not over-block unrelated names that merely share a prefix', () => {
+      expect(isPathSafe('C:\\Windows\\infrastructure')).toBe(true)
+    })
+
+    it('still allows the Windows Update download cache', () => {
+      expect(isPathSafe('C:\\Windows\\SoftwareDistribution\\Download')).toBe(true)
+    })
+  })
+
+  describe('isProcessProtected', () => {
+    it('protects processes by the name Get-Process reports (no .exe)', () => {
+      for (const name of ['svchost', 'lsass', 'csrss', 'winlogon', 'wininit', 'services', 'explorer']) {
+        expect(isProcessProtected(name)).toBe(true)
+      }
+    })
+
+    it('is case-insensitive and accepts the .exe form', () => {
+      expect(isProcessProtected('LSASS.EXE')).toBe(true)
+      expect(isProcessProtected('System')).toBe(true)
+      expect(isProcessProtected('Memory Compression')).toBe(true)
+    })
+
+    it('does not protect regular apps', () => {
+      expect(isProcessProtected('chrome')).toBe(false)
+      expect(isProcessProtected('notepad.exe')).toBe(false)
+    })
+  })
+
+  describe('registry key helpers', () => {
+    it('normalizes every spelling of the hive root', () => {
+      expect(normalizeRegistryKey('HKEY_LOCAL_MACHINE\\SOFTWARE\\X')).toBe('HKLM:\\SOFTWARE\\X')
+      expect(normalizeRegistryKey('HKEY_CURRENT_USER\\Software\\Y')).toBe('HKCU:\\Software\\Y')
+      expect(normalizeRegistryKey('HKLM\\SOFTWARE\\X')).toBe('HKLM:\\SOFTWARE\\X')
+      expect(normalizeRegistryKey('Microsoft.PowerShell.Core\\Registry::HKEY_CURRENT_USER\\Software\\Y')).toBe(
+        'HKCU:\\Software\\Y'
+      )
+    })
+
+    it('protects keys regardless of how the root is written', () => {
+      expect(isRegistryKeyProtected('HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\X')).toBe(true)
+      expect(isRegistryKeyProtected('HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\X')).toBe(true)
+      expect(isRegistryKeyProtected('HKLM:\\SYSTEM\\CurrentControlSet\\Services\\Foo')).toBe(true)
+    })
+
+    it('allows ordinary Run / Uninstall keys', () => {
+      expect(isRegistryKeyProtected('HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run')).toBe(false)
+      expect(
+        isRegistryKeyProtected('HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\OldApp')
+      ).toBe(false)
+    })
+  })
+
+  describe('anonymizeText', () => {
+    const originalEnv = process.env
+
+    afterEach(() => {
+      process.env = originalEnv
+    })
+
+    it('does not corrupt text when the environment variables are empty (non-Windows)', () => {
+      process.env = { ...originalEnv }
+      delete process.env.USERNAME
+      delete process.env.COMPUTERNAME
+      delete process.env.USERPROFILE
+      expect(anonymizeText('hello world')).toBe('hello world')
+    })
+
+    it('does not re-match its own placeholders when the username is "User"', () => {
+      process.env = { ...originalEnv, USERNAME: 'User', USERPROFILE: 'C:\\Users\\User', COMPUTERNAME: '' }
+      expect(anonymizeText('C:\\Users\\User\\x and User')).toBe('C:\\Users\\[USER]\\x and [USER]')
+    })
+
+    it('anonymizes any profile folder, not only the current user', () => {
+      process.env = { ...originalEnv, USERNAME: '', COMPUTERNAME: '', USERPROFILE: '' }
+      expect(anonymizeText('see C:\\Users\\Maria\\file.txt')).toBe('see C:\\Users\\[USER]\\file.txt')
+    })
+
+    it('returns valid structures from anonymizeForAI even with backslashes', () => {
+      process.env = { ...originalEnv, USERNAME: 'TestUser', COMPUTERNAME: 'MY-PC', USERPROFILE: 'C:\\Users\\TestUser' }
+      const result = anonymizeForAI({ path: 'C:\\Users\\TestUser\\AppData', nested: { list: ['TestUser'] } })
+      expect(result.path).toBe('C:\\Users\\[USER]\\AppData')
+      expect(result.nested).toEqual({ list: ['[USER]'] })
     })
   })
 })

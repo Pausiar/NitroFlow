@@ -1,5 +1,6 @@
 import axios from 'axios'
 import log from 'electron-log'
+import { anonymizeText } from '../utils/security'
 import type { ChatMessage, SystemContext, ProcessInfo, ProcessAIVerdict } from '../../shared/types'
 
 const NVIDIA_NIM_BASE_URL = (
@@ -38,6 +39,10 @@ export class AIService {
     options: NimOptions = {}
   ): Promise<string> {
     const { temperature = 0.4, maxTokens = 1024, timeout = 30000 } = options
+    // Strip usernames, profile paths, computer name, IPs and MACs from
+    // everything that leaves the machine. (anonymizeForAI existed but was
+    // never called, so the README's privacy promise was not being kept.)
+    const safeMessages = messages.map((m) => ({ ...m, content: anonymizeText(m.content) }))
     const candidates = Array.from(new Set([model || DEFAULT_MODEL, ...FALLBACK_MODELS].filter(Boolean)))
 
     let lastError: unknown = null
@@ -45,7 +50,7 @@ export class AIService {
       try {
         const response = await axios.post(
           `${NVIDIA_NIM_BASE_URL}/chat/completions`,
-          { model: candidate, messages, temperature, max_tokens: maxTokens, stream: false },
+          { model: candidate, messages: safeMessages, temperature, max_tokens: maxTokens, stream: false },
           {
             headers: {
               Authorization: `Bearer ${apiKey}`,
