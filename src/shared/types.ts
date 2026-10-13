@@ -146,7 +146,6 @@ export type SmartFixId =
   | 'cleanup_safe'
   | 'startup_disable_recommended'
   | 'power_plan_balanced'
-  | 'restore_visual_defaults'
   | 'empty_recycle_bin'
 
 export interface HealthReport {
@@ -163,6 +162,12 @@ export interface SmartFixResult {
   fixId: SmartFixId
   success: boolean
   message: string
+  /** Items affected (e.g. startup programs disabled). */
+  count?: number
+  /** Disk space freed by this fix, in MB. */
+  freedMB?: number
+  /** True when the fix was not applied on purpose (e.g. nothing to do, or no restore point). */
+  skipped?: boolean
 }
 
 export interface SmartOptimizeResult {
@@ -257,6 +262,20 @@ export type LicensePlan = 'free' | 'pro'
 export interface OptimizerStatus {
   currentMode: PerformanceMode
   appliedAt: number | null
+  /** True when the PC has a battery (laptop). Undefined while still detecting. */
+  isLaptop?: boolean
+  /** Non-critical problems from the last mode change, in plain Spanish. */
+  warnings?: string[]
+  /** True when NitroFlow holds a copy of the original settings ("Equilibrado" restores it). */
+  hasSnapshot?: boolean
+}
+
+/** Result of OptimizerService.applyMode. */
+export interface OptimizerApplyResult {
+  success: boolean
+  error?: string
+  /** Steps that could not be applied (the mode is still active). */
+  warnings?: string[]
 }
 
 export interface ProcessAIVerdict {

@@ -1,7 +1,7 @@
 import { app, ipcMain, BrowserWindow } from 'electron'
 import log from 'electron-log'
 import { IPC_CHANNELS } from '../../shared/types'
-import type { AppSettings, PerformanceMode, UndoPayload } from '../../shared/types'
+import type { AppSettings, PerformanceMode, RestorePointResult, SmartFixId, UndoPayload } from '../../shared/types'
 import { sanitizeSettingsUpdate } from '../utils/settings-validation'
 import { SystemMonitor } from '../services/system-monitor'
 import { ProcessManager } from '../services/process-manager'
@@ -13,6 +13,9 @@ import { HistoryService } from '../services/history'
 import { SettingsService } from '../services/settings'
 import { OptimizerService } from '../services/optimizer'
 import { AuthService } from '../services/auth'
+import { RestorePointService } from '../services/restore-point'
+import { HealthService, SMART_FIX_IDS, formatSize, isAdminCached } from '../services/health'
+import type { SmartActionEvent } from '../services/health'
 
 export interface IpcDependencies {
   /** The single monitor instance owned by the main process (also pushes live metrics). */
@@ -53,11 +56,48 @@ export function setupIpcHandlers(deps: IpcDependencies): void {
   const settingsService = SettingsService.getInstance()
   const optimizerService = OptimizerService.getInstance()
   const authService = new AuthService()
+  const restorePointService = new RestorePointService()
+  const healthService = new HealthService({
+    cleanup: cleanupService,
+    startup: startupManager,
+    restorePoint: restorePointService,
+    isAdmin: isAdminCached,
+    shouldCreateRestorePoint: () => settingsService.get().createRestorePoints !== false
+  })
+  /** Prevents two one-click optimizations from overlapping (e.g. a double click). */
+  let smartRunning = false
 
   /** Records an action and tells the renderer to refresh its history list. */
   const recordAction = (opts: Parameters<HistoryService['record']>[0]): void => {
     historyService.record(opts)
     broadcast(IPC_CHANNELS.ACTION_COMPLETE, { type: opts.type })
+  }
+
+  /** Records a restore point that was really created (a skipped one is not news). */
+  const recordRestorePoint = (result: RestorePointResult, reason: string): void => {
+    if (result.success && !result.skipped && process.platform === 'win32') {
+      recordAction({
+        type: 'settings',
+        description: 'Punto de restauración creado',
+        details: `Punto de restauración de Windows creado ${reason}. Se puede usar desde "Restaurar sistema".`,
+        reversible: false
+      })
+    }
+  }
+
+  /**
+   * Best-effort restore point before risky changes (registry, performance
+   * modes). Never blocks the action: those services keep their own backups.
+   */
+  const restorePointBefore = async (reason: string): Promise<void> => {
+    if (process.platform !== 'win32' || !settingsService.get().createRestorePoints) return
+    try {
+      const result = await restorePointService.create(`NitroFlow: ${reason}`)
+      recordRestorePoint(result, reason)
+      if (!result.success) notify('warning', result.message)
+    } catch (err) {
+      log.warn('Restore point before action failed:', err)
+    }
   }
 
   // Undo for actions that need other services (startup / service / optimizer).
@@ -232,6 +272,7 @@ export function setupIpcHandlers(deps: IpcDependencies): void {
       return { fixed: 0, backed_up: false, errors: ['Petición inválida'] }
     }
     try {
+      if (entryIds.length > 0) await restorePointBefore('antes de limpiar el registro')
       const result = await registryService.clean(entryIds)
       // Nothing changed -> nothing to record (or to "undo").
       if (result.fixed > 0) {
@@ -311,6 +352,9 @@ export function setupIpcHandlers(deps: IpcDependencies): void {
     const newMode = mode as PerformanceMode
     try {
       const previousMode = optimizerService.getStatus().currentMode
+      if (newMode !== 'balanced' && newMode !== previousMode) {
+        await restorePointBefore(`antes de activar el modo "${newMode}"`)
+      }
       const result = await optimizerService.applyMode(newMode)
       if (result.success) {
         recordAction({
@@ -327,6 +371,103 @@ export function setupIpcHandlers(deps: IpcDependencies): void {
       log.error('OPTIMIZER_SET_MODE error:', err)
       return { success: false, error: String(err) }
     }
+  })
+
+  // ── Smart optimization (one click) / safety ──────
+  ipcMain.handle(IPC_CHANNELS.HEALTH_SCAN, async () => {
+    try {
+      return await healthService.scan()
+    } catch (err) {
+      log.error('HEALTH_SCAN error:', err)
+      return null
+    }
+  })
+
+  ipcMain.handle(IPC_CHANNELS.SMART_OPTIMIZE, async (_event, fixIds: unknown) => {
+    if (!isStringArray(fixIds) || !fixIds.every((id) => SMART_FIX_IDS.includes(id as SmartFixId))) {
+      return { error: 'Petición de optimización inválida' }
+    }
+    if (smartRunning) return { error: 'Ya hay una optimización en curso' }
+    smartRunning = true
+
+    const onAction = (e: SmartActionEvent): void => {
+      switch (e.kind) {
+        case 'startup':
+          // One entry per program so each one can be re-enabled from Historial.
+          recordAction({
+            type: 'startup',
+            description: `Inicio automático desactivado: ${e.name}`,
+            details: `Optimización en 1 clic: "${e.name}" ya no se abre al encender el PC`,
+            reversible: true,
+            undo: { kind: 'startup', id: e.id, enabled: true }
+          })
+          break
+        case 'cleanup':
+          recordAction({
+            type: 'cleanup',
+            description: `${e.label}: ${formatSize(e.freedMB)} liberados`,
+            details: `Optimización en 1 clic. Categorías limpiadas: ${e.categoryIds.join(', ')}`,
+            reversible: false
+          })
+          break
+        case 'power_plan':
+          recordAction({
+            type: 'settings',
+            description: 'Modo de energía "Equilibrado" activado',
+            details: 'Optimización en 1 clic. Se puede cambiar en Configuración de Windows > Energía.',
+            reversible: false
+          })
+          break
+      }
+    }
+
+    try {
+      const result = await healthService.smartOptimize(
+        [...new Set(fixIds)] as SmartFixId[],
+        (progress) => broadcast(IPC_CHANNELS.SMART_PROGRESS, progress),
+        onAction
+      )
+      recordRestorePoint(result.restorePoint, 'antes de la optimización en 1 clic')
+      const ok = result.results.filter((r) => r.success).length
+      const failed = result.results.filter((r) => !r.success && !r.skipped).length
+      if (failed > 0) {
+        notify('warning', `Optimización completada con ${failed} aviso${failed === 1 ? '' : 's'}`)
+      } else {
+        notify(
+          'success',
+          result.freedMB > 0
+            ? `Optimización completada: ${formatSize(result.freedMB)} liberados`
+            : `Optimización completada (${ok} mejora${ok === 1 ? '' : 's'} aplicada${ok === 1 ? '' : 's'})`
+        )
+      }
+      return result
+    } catch (err) {
+      log.error('SMART_OPTIMIZE error:', err)
+      return { error: String(err) }
+    } finally {
+      smartRunning = false
+    }
+  })
+
+  ipcMain.handle(IPC_CHANNELS.CREATE_RESTORE_POINT, async () => {
+    try {
+      const result = await restorePointService.create('NitroFlow: punto de restauración manual')
+      recordRestorePoint(result, 'manualmente')
+      return result
+    } catch (err) {
+      log.error('CREATE_RESTORE_POINT error:', err)
+      return { success: false, message: String(err) }
+    }
+  })
+
+  ipcMain.handle(IPC_CHANNELS.GET_APP_INFO, async () => {
+    let isAdmin = false
+    try {
+      isAdmin = await isAdminCached()
+    } catch {
+      // Treated as not elevated.
+    }
+    return { version: app.getVersion(), isAdmin, platform: process.platform }
   })
 
   // ── History ──────────────────────────────────────

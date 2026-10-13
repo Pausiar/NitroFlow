@@ -95,6 +95,10 @@ interface AppState {
   confirmDialog: ConfirmState | null
   requestConfirm: (options: ConfirmOptions) => Promise<boolean>
   resolveConfirm: (value: boolean) => void
+
+  // One-click optimization: last health report (kept while the app is open)
+  healthReport: import('../../../shared/types').HealthReport | null
+  setHealthReport: (r: import('../../../shared/types').HealthReport | null) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -180,5 +184,8 @@ export const useAppStore = create<AppState>((set) => ({
     set((state) => {
       state.confirmDialog?.resolve(value)
       return { confirmDialog: null }
-    })
+    }),
+
+  healthReport: null,
+  setHealthReport: (healthReport) => set({ healthReport })
 }))

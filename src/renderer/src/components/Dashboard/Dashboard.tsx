@@ -4,6 +4,7 @@ import { MetricCard } from './MetricCard'
 import { UsageChart } from './UsageChart'
 import { DiskList } from './DiskList'
 import { QuickActions } from './QuickActions'
+import { SmartOptimize } from './SmartOptimize'
 import { Cpu, MemoryStick, HardDrive, Activity } from 'lucide-react'
 
 export function Dashboard() {
@@ -21,18 +22,23 @@ export function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-fluent-text">Panel de rendimiento</h1>
-          <p className="text-fluent-textMuted text-sm mt-1">
-            Estado del sistema en tiempo real
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-fluent-success ml-2 live-dot" />
-          </p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-fluent-text">Panel</h1>
+        <p className="text-fluent-textMuted text-sm mt-1">Mejora tu PC con un clic, de forma segura</p>
+      </div>
+
+      {/* One-click optimization: the main thing a user comes here for */}
+      <SmartOptimize />
+
+      <div className="flex items-center gap-2 pt-2">
+        <h2 className="text-sm font-semibold text-fluent-textMuted uppercase tracking-wide">
+          Estado del sistema en tiempo real
+        </h2>
+        <span className="inline-block w-1.5 h-1.5 rounded-full bg-fluent-success live-dot" />
       </div>
 
       {/* Metric cards */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
         <MetricCard
           title="CPU"
           value={`${cpu?.usagePercent ?? 0}%`}
@@ -68,7 +74,7 @@ export function Dashboard() {
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
         <div className="card">
           <h3 className="text-sm font-semibold text-fluent-textMuted mb-3 uppercase tracking-wide">
             Historial CPU
