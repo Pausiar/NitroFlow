@@ -16,6 +16,10 @@ jest.mock('../src/main/utils/powershell', () => {
   const PARSE_ERROR = /ParserError|Unexpected token|Missing (closing|expression|argument)|is not recognized as|The term '.*' is not recognized/i
   const wrapped = async (script: string, timeoutMs?: number) => {
     const result = await actual.runPowerShellResult(script, timeoutMs)
+    if (result.stderr) {
+      // Printed so CI logs show the exact PowerShell error behind a failure.
+      console.log(`[powershell stderr] ${result.stderr}\n--- script ---\n${script}`)
+    }
     if (PARSE_ERROR.test(result.stderr)) {
       scriptErrors.push(`${result.stderr}\n--- script ---\n${script.slice(0, 400)}`)
     }
