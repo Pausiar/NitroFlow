@@ -20,8 +20,10 @@ export function SiteFooter() {
           <h2 className="text-sm font-semibold text-white">Producto</h2>
           <ul className="mt-3 space-y-2 text-sm text-[var(--color-text-muted)]">
             <li><Link href="/#features" className="hover:text-white">Caracteristicas</Link></li>
+            <li><Link href="/#como-funciona" className="hover:text-white">Cómo funciona</Link></li>
             <li><Link href="/#pricing" className="hover:text-white">Precios</Link></li>
             <li><Link href="/#faq" className="hover:text-white">FAQ</Link></li>
+            <li><a href="https://github.com/Pausiar/NitroFlow/releases/latest" className="hover:text-white">Descargar para Windows</a></li>
           </ul>
         </div>
 
