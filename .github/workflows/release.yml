@@ -30,6 +30,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Unit tests
+        run: npx jest
+
       - name: Build (electron-vite)
         run: npm run build
 
@@ -52,6 +55,10 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.TAG }}
+          # Tag the commit that was built (a manual run from a branch would
+          # otherwise tag the default branch).
+          target_commitish: ${{ github.sha }}
+          generate_release_notes: true
           name: NitroFlow ${{ steps.tag.outputs.TAG }}
           draft: false
           prerelease: false
