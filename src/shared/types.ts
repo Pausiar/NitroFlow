@@ -82,7 +82,16 @@ export interface StartupEntry {
   enabled: boolean
   impact: 'High' | 'Medium' | 'Low' | 'Unknown'
   description: string
+  /** Plain-language advice for non-expert users (from the known-apps database). */
+  recommendation?: StartupRecommendation
+  /** Short explanation shown next to the recommendation. */
+  recommendationReason?: string
+  /** True for security software / drivers: the UI must not offer to disable it. */
+  essential?: boolean
 }
+
+/** 'disable' = safe and useful to turn off, 'keep' = leave on, 'optional' = user's choice. */
+export type StartupRecommendation = 'disable' | 'keep' | 'optional'
 
 // ─── Cleanup ────────────────────────────────
 export interface CleanupCategory {
@@ -93,6 +102,10 @@ export interface CleanupCategory {
   sizeMB: number
   fileCount: number
   safe: boolean
+  /** Pre-selected and used by the one-click optimization (no risk of losing user data). */
+  recommended?: boolean
+  /** Plain-language warning shown when the category is not recommended. */
+  warning?: string
 }
 
 export interface CleanupResult {
@@ -105,6 +118,70 @@ export interface CleanupResult {
   requiresAdmin?: boolean
   /** True when the category had nothing to clean (not an error). */
   empty?: boolean
+}
+
+// ─── Smart optimization (one click) ──────────
+export type HealthSeverity = 'critical' | 'warning' | 'info'
+
+/** One problem found by the health check, explained for a non-expert user. */
+export interface HealthIssue {
+  id: string
+  title: string
+  /** What is wrong, in plain language. */
+  description: string
+  severity: HealthSeverity
+  /** Id of the automatic fix, or undefined if it is only advice. */
+  fixId?: SmartFixId
+  /** Label of the button / checklist item for the fix. */
+  fixLabel?: string
+  /** True when the fix is safe enough to be pre-selected in "Optimizar ahora". */
+  autoFix: boolean
+  /** Human readable estimate, e.g. "2,3 GB" or "~10 s menos de arranque". */
+  benefit?: string
+  /** Page where the user can review it manually. */
+  page?: 'cleanup' | 'startup' | 'optimizer' | 'processes' | 'registry'
+}
+
+export type SmartFixId =
+  | 'cleanup_safe'
+  | 'startup_disable_recommended'
+  | 'power_plan_balanced'
+  | 'restore_visual_defaults'
+  | 'empty_recycle_bin'
+
+export interface HealthReport {
+  /** 0-100, higher is better. */
+  score: number
+  issues: HealthIssue[]
+  /** Summary sentence for the dashboard. */
+  summary: string
+  scannedAt: number
+  isAdmin: boolean
+}
+
+export interface SmartFixResult {
+  fixId: SmartFixId
+  success: boolean
+  message: string
+}
+
+export interface SmartOptimizeResult {
+  restorePoint: RestorePointResult
+  results: SmartFixResult[]
+  freedMB: number
+}
+
+export interface RestorePointResult {
+  success: boolean
+  /** True when Windows skipped it because one was created in the last 24 h (still protected). */
+  skipped?: boolean
+  message: string
+}
+
+/** Progress events sent while the one-click optimization runs. */
+export interface SmartProgress {
+  step: string
+  percent: number
 }
 
 // ─── Registry ───────────────────────────────
@@ -205,6 +282,12 @@ export interface AppSettings {
   licenseToken: string
   licenseEmail: string
   licensePlan: LicensePlan | null
+  /** Shows expert pages (registry, processes & services). Off by default. */
+  advancedMode: boolean
+  /** True once the first-run welcome has been shown. */
+  onboardingDone: boolean
+  /** Create a System Restore point before applying system changes. */
+  createRestorePoints: boolean
 }
 
 export interface LicenseStatus {
@@ -260,11 +343,18 @@ export const IPC_CHANNELS = {
   OPTIMIZER_GET_STATUS: 'optimizer:get-status',
   OPTIMIZER_SET_MODE: 'optimizer:set-mode',
 
+  // Smart optimization / safety
+  HEALTH_SCAN: 'smart:scan',
+  SMART_OPTIMIZE: 'smart:optimize',
+  CREATE_RESTORE_POINT: 'safety:restore-point',
+  GET_APP_INFO: 'app:info',
+
   // Process AI analysis
   ANALYZE_PROCESSES: 'processes:ai-analyze',
 
   // Events (main → renderer)
   METRICS_UPDATE: 'event:metrics-update',
   ACTION_COMPLETE: 'event:action-complete',
-  NOTIFICATION: 'event:notification'
+  NOTIFICATION: 'event:notification',
+  SMART_PROGRESS: 'event:smart-progress'
 } as const

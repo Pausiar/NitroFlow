@@ -139,7 +139,10 @@ export const useAppStore = create<AppState>((set) => ({
     webApiBaseUrl: 'https://web-tau-two-22.vercel.app',
     licenseToken: '',
     licenseEmail: '',
-    licensePlan: null as LicensePlan | null
+    licensePlan: null as LicensePlan | null,
+    advancedMode: false,
+    onboardingDone: true,
+    createRestorePoints: true
   },
   setSettings: (settings) => set({ settings }),
 

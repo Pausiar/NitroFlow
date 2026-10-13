@@ -37,6 +37,11 @@ declare global {
       analyzeProcesses: (processes: unknown[]) => Promise<unknown>
       getOptimizerStatus: () => Promise<unknown>
       setOptimizerMode: (mode: string) => Promise<unknown>
+      healthScan: () => Promise<unknown>
+      smartOptimize: (fixIds: string[]) => Promise<unknown>
+      createRestorePoint: () => Promise<unknown>
+      getAppInfo: () => Promise<unknown>
+      onSmartProgress: (cb: (p: unknown) => void) => () => void
       getHistory: () => Promise<unknown>
       undoAction: (id: string) => Promise<unknown>
       getSettings: () => Promise<unknown>
