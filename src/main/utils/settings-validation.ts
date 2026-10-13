@@ -27,5 +27,8 @@ export function sanitizeSettingsUpdate(input: unknown): Partial<AppSettings> {
   if (input.language === 'es' || input.language === 'en') out.language = input.language
   if (typeof input.notifications === 'boolean') out.notifications = input.notifications
   if (typeof input.startWithWindows === 'boolean') out.startWithWindows = input.startWithWindows
+  if (typeof input.advancedMode === 'boolean') out.advancedMode = input.advancedMode
+  if (typeof input.onboardingDone === 'boolean') out.onboardingDone = input.onboardingDone
+  if (typeof input.createRestorePoints === 'boolean') out.createRestorePoints = input.createRestorePoints
   return out
 }

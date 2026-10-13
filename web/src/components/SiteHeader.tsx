@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Menu, X, LogOut, LayoutDashboard, Sparkles } from "lucide-react";
+import { Menu, X, LogOut, LayoutDashboard, Sparkles, Download } from "lucide-react";
 import { LogoMark } from "@/components/Logo";
 import { createClient } from "@/lib/supabase-client";
+
+const DOWNLOAD_URL = "https://github.com/Pausiar/NitroFlow/releases/latest";
 
 type SessionUser = {
   email: string | null;
@@ -116,6 +118,14 @@ export function SiteHeader() {
         </nav>
 
         <div className="hidden items-center gap-2 md:flex">
+          <a
+            href={DOWNLOAD_URL}
+            title="Descargar NitroFlow 1.3.0 para Windows"
+            className="inline-flex items-center gap-2 rounded-md bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white shadow-[0_8px_24px_rgba(0,120,212,0.35)] transition hover:bg-[var(--color-accent-hover)]"
+          >
+            <Download size={16} />
+            Descargar
+          </a>
           {user ? (
             <>
               <Link
@@ -171,6 +181,14 @@ export function SiteHeader() {
       {open ? (
         <div className="border-t border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 md:hidden">
           <div className="flex flex-col gap-1">
+            <a
+              href={DOWNLOAD_URL}
+              onClick={() => setOpen(false)}
+              className="inline-flex items-center justify-center gap-2 rounded-md bg-[var(--color-accent)] px-3 py-2 text-center text-sm font-medium text-white"
+            >
+              <Download size={16} />
+              Descargar para Windows
+            </a>
             {links.map((link) => (
               <Link
                 key={link.href}

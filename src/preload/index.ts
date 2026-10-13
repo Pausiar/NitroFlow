@@ -50,6 +50,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getOptimizerStatus: () => ipcRenderer.invoke(IPC_CHANNELS.OPTIMIZER_GET_STATUS),
   setOptimizerMode: (mode: string) => ipcRenderer.invoke(IPC_CHANNELS.OPTIMIZER_SET_MODE, mode),
 
+  // Smart optimization / safety
+  healthScan: () => ipcRenderer.invoke(IPC_CHANNELS.HEALTH_SCAN),
+  smartOptimize: (fixIds: string[]) => ipcRenderer.invoke(IPC_CHANNELS.SMART_OPTIMIZE, fixIds),
+  createRestorePoint: () => ipcRenderer.invoke(IPC_CHANNELS.CREATE_RESTORE_POINT),
+  getAppInfo: () => ipcRenderer.invoke(IPC_CHANNELS.GET_APP_INFO),
+  onSmartProgress: (cb: (progress: unknown) => void) => {
+    const listener = (_: Electron.IpcRendererEvent, data: unknown) => cb(data)
+    ipcRenderer.on(IPC_CHANNELS.SMART_PROGRESS, listener)
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.SMART_PROGRESS, listener)
+  },
+
   // History
   getHistory: () => ipcRenderer.invoke(IPC_CHANNELS.GET_HISTORY),
   undoAction: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.UNDO_ACTION, id),

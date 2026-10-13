@@ -3,11 +3,13 @@ import {
   ArrowRight,
   Bot,
   Check,
-  Cpu,
-  Database,
+  Download,
   Gauge,
   HardDrive,
+  ListChecks,
   Rocket,
+  RotateCcw,
+  Search,
   ShieldCheck,
   Sparkles,
   Trash2,
@@ -17,56 +19,88 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { BuyProButton } from "@/components/BuyProButton";
 
+const APP_VERSION = "1.3.0";
+const DOWNLOAD_URL = "https://github.com/Pausiar/NitroFlow/releases/latest";
+
 const features = [
   {
+    icon: Sparkles,
+    title: "Optimización en 1 clic",
+    description:
+      "Pulsa «Analizar mi PC» y recibe una puntuación de salud de 0 a 100, con los problemas explicados en lenguaje sencillo. «Optimizar ahora» aplica solo lo que tú elijas."
+  },
+  {
     icon: Trash2,
-    title: "Limpieza profunda",
+    title: "Limpieza segura",
     description:
-      "Elimina archivos temporales, cache de prefetch, miniaturas, descargas de Windows Update y mas con un solo clic."
-  },
-  {
-    icon: Cpu,
-    title: "Gestor de procesos",
-    description:
-      "Lista en tiempo real con uso de CPU/RAM. Cierra procesos de usuario de forma segura, los del sistema estan protegidos."
-  },
-  {
-    icon: Database,
-    title: "Optimizador de registro",
-    description:
-      "Detecta entradas huerfanas y de inicio invalidas. Backup automatico antes de cualquier modificacion."
+      "Borra lo que Windows y los programas regeneran: temporales de más de 24 horas, cachés de navegadores, Windows Update, informes de errores y volcados de memoria. La papelera y Prefetch son opcionales y avisan antes."
   },
   {
     icon: Rocket,
-    title: "Gestor de inicio",
+    title: "Programas de inicio",
     description:
-      "Visualiza programas en HKCU, HKLM y carpeta Startup. Desactiva con un clic y ve impacto Alto/Medio/Bajo."
+      "Cada programa llega con una recomendación clara: Recomendado desactivar, Mantener u Opcional. Los programas esenciales, como el antivirus y los drivers, están protegidos."
+  },
+  {
+    icon: Zap,
+    title: "Modos de rendimiento",
+    description:
+      "Equilibrado, Rendimiento y Juegos. NitroFlow guarda tus ajustes originales y el modo Equilibrado los restaura exactamente. Pensado también para portátiles."
   },
   {
     icon: Gauge,
     title: "Panel de rendimiento",
     description:
-      "CPU, RAM, disco y red en vivo con historial visual. Detecta cuellos de botella al instante."
+      "CPU, RAM, disco y red en vivo, con historial visual para detectar cuellos de botella al instante."
   },
   {
     icon: Bot,
     title: "Asistente con IA",
     description:
-      "Recibe el contexto de tu sistema y responde dudas tecnicas. Recomendaciones personalizadas y seguras."
+      "Opcional, con NVIDIA NIM. Responde dudas sobre tu sistema y propone mejoras. Funciona sin API key en modo offline y nunca ejecuta acciones sin tu confirmación."
   }
 ];
 
-const stats = [
-  { label: "Espacio liberado promedio", value: "12 GB" },
-  { label: "Reduccion tiempo de arranque", value: "38%" },
-  { label: "Procesos protegidos", value: "120+" },
-  { label: "Modelos IA soportados", value: "3" }
+const steps = [
+  {
+    icon: Search,
+    title: "Analiza tu PC",
+    description:
+      "Pulsa «Analizar mi PC» en el Panel. NitroFlow revisa tu sistema y te da una puntuación de 0 a 100 con los problemas explicados sin tecnicismos."
+  },
+  {
+    icon: ListChecks,
+    title: "Revisa la propuesta",
+    description:
+      "Cada cambio aparece con su explicación antes de aplicar nada. Tú decides qué se hace y qué se queda como está."
+  },
+  {
+    icon: RotateCcw,
+    title: "Optimiza con red de seguridad",
+    description:
+      "Pulsa «Optimizar ahora». Antes de los cambios importantes se crea un punto de restauración de Windows, y lo que sea reversible se puede deshacer desde Historial."
+  }
+];
+
+const facts = [
+  { label: "Versión actual", value: APP_VERSION },
+  { label: "Windows compatible", value: "10 y 11" },
+  { label: "Modo por defecto", value: "Sencillo" },
+  { label: "Para deshacer cambios", value: "Historial" }
 ];
 
 const faqs = [
   {
     q: "Es seguro tocar el registro?",
     a: "Si. NitroFlow hace un backup .reg automatico antes de cualquier cambio y bloquea claves criticas como SYSTEM, SAM, Security y Winlogon."
+  },
+  {
+    q: "Se borran mis documentos o fotos?",
+    a: "No. La limpieza solo elimina archivos temporales de más de 24 horas y cachés que Windows o los programas regeneran. Documentos, fotos y vídeos no se tocan."
+  },
+  {
+    q: "Qué pasa si algo sale mal?",
+    a: "Antes de los cambios importantes NitroFlow crea un punto de restauración de Windows, que puedes usar desde «Restaurar sistema». Los cambios de inicio y de modo de rendimiento se pueden deshacer desde Historial."
   },
   {
     q: "Como funciona el asistente de IA?",
@@ -82,6 +116,29 @@ const faqs = [
   }
 ];
 
+const startupExamples = [
+  {
+    name: "Actualizador de un programa",
+    tag: "Recomendado desactivar",
+    cls: "text-orange-300 bg-orange-500/15 border-orange-500/30"
+  },
+  {
+    name: "Antivirus",
+    tag: "Mantener · protegido",
+    cls: "text-[var(--color-success)] bg-[var(--color-success)]/10 border-[var(--color-success)]/30"
+  },
+  {
+    name: "Driver de audio",
+    tag: "Mantener · protegido",
+    cls: "text-[var(--color-success)] bg-[var(--color-success)]/10 border-[var(--color-success)]/30"
+  },
+  {
+    name: "Chat de escritorio",
+    tag: "Opcional",
+    cls: "text-[var(--color-text-muted)] bg-[var(--color-surface)] border-[var(--color-border)]"
+  }
+];
+
 export default function HomePage() {
   return (
     <>
@@ -94,34 +151,36 @@ export default function HomePage() {
             <div className="mx-auto max-w-3xl text-center">
               <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-[var(--color-card)]/60 px-3 py-1 text-xs text-[var(--color-text-muted)] backdrop-blur">
                 <Sparkles size={12} className="text-[var(--color-accent)]" />
-                Nuevo: asistente con IA
+                Novedad en {APP_VERSION}: optimización en 1 clic
               </div>
               <h1 className="mt-6 text-4xl font-bold tracking-tight text-white sm:text-6xl">
-                Optimiza tu Windows con
+                Optimiza tu PC en 1 clic,
                 <br />
-                <span className="accent-gradient">cero esfuerzo</span>
+                <span className="accent-gradient">sin riesgos</span>
               </h1>
               <p className="mx-auto mt-6 max-w-2xl text-base text-[var(--color-text-muted)] sm:text-lg">
-                NitroFlow combina herramientas profesionales de optimizacion con un
-                asistente IA para que tu PC siempre rinda al maximo, de forma segura.
+                NitroFlow analiza tu Windows, te explica en lenguaje sencillo qué se puede
+                mejorar y aplica las mejoras que tú elijas, con un punto de restauración de
+                Windows como red de seguridad.
               </p>
               <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                <Link
-                  href="#pricing"
+                <a
+                  href={DOWNLOAD_URL}
                   className="inline-flex items-center gap-2 rounded-md bg-[var(--color-accent)] px-6 py-3 text-sm font-medium text-white shadow-[0_10px_30px_rgba(0,120,212,0.4)] transition hover:bg-[var(--color-accent-hover)]"
                 >
-                  Empezar ahora
-                  <ArrowRight size={16} />
-                </Link>
+                  <Download size={16} />
+                  Descargar para Windows
+                </a>
                 <Link
-                  href="#features"
+                  href="#como-funciona"
                   className="inline-flex items-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-card)] px-6 py-3 text-sm font-medium text-white hover:border-[var(--color-border-strong)]"
                 >
-                  Ver caracteristicas
+                  Cómo funciona
+                  <ArrowRight size={16} />
                 </Link>
               </div>
               <p className="mt-4 text-xs text-[var(--color-text-dim)]">
-                Windows 10/11. Solo necesitas una cuenta de Google.
+                Versión {APP_VERSION} · Windows 10 y 11 · Gratis para empezar
               </p>
             </div>
 
@@ -140,9 +199,7 @@ export default function HomePage() {
                     {[
                       { icon: Gauge, label: "Panel" },
                       { icon: Trash2, label: "Limpieza" },
-                      { icon: Cpu, label: "Procesos" },
-                      { icon: Database, label: "Registro" },
-                      { icon: Rocket, label: "Inicio" },
+                      { icon: Rocket, label: "Programas de inicio" },
                       { icon: Zap, label: "Rendimiento" },
                       { icon: Bot, label: "Asistente IA" }
                     ].map(({ icon: Icon, label }, i) => (
@@ -231,11 +288,11 @@ export default function HomePage() {
 
         <section className="border-y border-[var(--color-border)] bg-[var(--color-surface)]/50">
           <div className="mx-auto grid max-w-7xl grid-cols-2 gap-8 px-4 py-10 sm:grid-cols-4 sm:px-6">
-            {stats.map((s) => (
-              <div key={s.label} className="text-center">
-                <div className="text-3xl font-bold text-white">{s.value}</div>
+            {facts.map((f) => (
+              <div key={f.label} className="text-center">
+                <div className="text-2xl font-bold text-white sm:text-3xl">{f.value}</div>
                 <div className="mt-1 text-xs uppercase tracking-wide text-[var(--color-text-dim)]">
-                  {s.label}
+                  {f.label}
                 </div>
               </div>
             ))}
@@ -246,8 +303,8 @@ export default function HomePage() {
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="text-3xl font-bold text-white sm:text-4xl">Todo en una sola app</h2>
             <p className="mt-3 text-[var(--color-text-muted)]">
-              Herramientas profesionales con la simplicidad de un clic. Disenadas para ser
-              seguras por defecto.
+              Un panel sencillo por defecto, diseñado para ser seguro desde el primer clic.
+              Las herramientas expertas siguen disponibles si las necesitas.
             </p>
           </div>
           <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -266,6 +323,41 @@ export default function HomePage() {
           </div>
         </section>
 
+        <section id="como-funciona" className="mx-auto max-w-7xl scroll-mt-24 px-4 py-24 sm:px-6">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-3xl font-bold text-white sm:text-4xl">Cómo funciona</h2>
+            <p className="mt-3 text-[var(--color-text-muted)]">
+              Tres pasos, sin conocimientos técnicos.
+            </p>
+          </div>
+          <ol className="mt-12 grid gap-4 md:grid-cols-3">
+            {steps.map((s, i) => (
+              <li
+                key={s.title}
+                className="rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] p-6"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-accent)] text-sm font-semibold text-white">
+                    {i + 1}
+                  </span>
+                  <s.icon size={18} className="text-[var(--color-info)]" />
+                </div>
+                <h3 className="mt-4 text-lg font-semibold text-white">{s.title}</h3>
+                <p className="mt-2 text-sm text-[var(--color-text-muted)]">{s.description}</p>
+              </li>
+            ))}
+          </ol>
+          <div className="mt-10 text-center">
+            <a
+              href={DOWNLOAD_URL}
+              className="inline-flex items-center gap-2 rounded-md bg-[var(--color-accent)] px-6 py-3 text-sm font-medium text-white transition hover:bg-[var(--color-accent-hover)]"
+            >
+              <Download size={16} />
+              Descargar para Windows
+            </a>
+          </div>
+        </section>
+
         <section className="border-y border-[var(--color-border)] bg-[var(--color-surface)]/40">
           <div className="mx-auto grid max-w-7xl items-center gap-10 px-4 py-20 sm:px-6 lg:grid-cols-2">
             <div>
@@ -277,18 +369,20 @@ export default function HomePage() {
                 Seguro. Reversible. Transparente.
               </h2>
               <p className="mt-3 text-[var(--color-text-muted)]">
-                Backup automatico antes de cada cambio en el registro. Bloqueo de procesos
-                criticos. La IA solo analiza y recomienda, jamas ejecuta sin tu visto bueno.
+                Un punto de restauración de Windows antes de los cambios importantes, reglas de
+                limpieza estrictas y programas esenciales protegidos. Lo que se puede deshacer,
+                se deshace desde Historial.
               </p>
               <ul className="mt-6 space-y-2 text-sm text-[var(--color-text)]">
                 {[
-                  "System32, WinSxS y carpetas personales nunca se tocan",
-                  "Procesos criticos (lsass, csrss, winlogon...) protegidos",
-                  "Anonimizacion antes de enviar contexto a la IA",
-                  "Toda accion queda registrada en el historial"
+                  "Punto de restauración automático antes de los cambios importantes (desactivable en Ajustes)",
+                  "Limpieza solo de temporales y cachés regenerables: nunca documentos, fotos ni vídeos",
+                  "Navegadores: solo carpetas de caché, nunca contraseñas, historial ni cookies",
+                  "Antivirus y drivers protegidos; System32, WinSxS y procesos críticos bloqueados",
+                  "Modo sencillo por defecto; los datos se anonimizan antes de enviarse a la IA"
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-2">
-                    <Check size={16} className="mt-0.5 text-[var(--color-success)]" />
+                    <Check size={16} className="mt-0.5 shrink-0 text-[var(--color-success)]" />
                     {item}
                   </li>
                 ))}
@@ -296,29 +390,30 @@ export default function HomePage() {
             </div>
             <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-card)] p-6 shadow-[var(--shadow-fluent-lg)]">
               <div className="flex items-center justify-between">
-                <p className="font-semibold text-white">Asistente IA</p>
-                <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-accent-soft)] px-2 py-0.5 text-[10px] uppercase tracking-wide text-[var(--color-info)]">
-                  <Bot size={10} /> IA
+                <p className="font-semibold text-white">Programas de inicio</p>
+                <span className="inline-flex items-center rounded-full bg-[var(--color-accent-soft)] px-2 py-0.5 text-[10px] uppercase tracking-wide text-[var(--color-info)]">
+                  Ejemplo
                 </span>
               </div>
-              <div className="mt-4 space-y-3 text-sm">
-                <div className="rounded-lg bg-[var(--color-surface)] p-3 text-[var(--color-text-muted)]">
-                  Mi PC va lento al arrancar. Que recomiendas?
-                </div>
-                <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3">
-                  <p className="text-white">
-                    He revisado tus 14 entradas de inicio. Tienes 3 con impacto Alto:
-                  </p>
-                  <ul className="mt-2 space-y-1 text-[var(--color-text-muted)]">
-                    <li>- Spotify (HKCU)</li>
-                    <li>- Discord (Startup folder)</li>
-                    <li>- OneDrive (HKLM)</li>
-                  </ul>
-                  <p className="mt-2 text-white">
-                    Quieres que las desactive? Aplicare backup automatico.
-                  </p>
-                </div>
-              </div>
+              <ul className="mt-4 space-y-2 text-sm">
+                {startupExamples.map((item) => (
+                  <li
+                    key={item.name}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] p-3"
+                  >
+                    <span className="text-white">{item.name}</span>
+                    <span
+                      className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] ${item.cls}`}
+                    >
+                      {item.tag}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-4 text-xs text-[var(--color-text-dim)]">
+                Los programas esenciales nunca se desactivan. Todo cambio se puede deshacer desde
+                Historial.
+              </p>
             </div>
           </div>
         </section>
@@ -446,9 +541,16 @@ export default function HomePage() {
               Listo para acelerar tu PC?
             </p>
             <p className="mx-auto mt-3 max-w-xl text-[var(--color-text-muted)]">
-              Crea tu cuenta gratis y prueba el asistente IA. Sube a Pro cuando lo necesites.
+              Descarga NitroFlow {APP_VERSION} para Windows y pulsa «Analizar mi PC». Crea tu cuenta gratis cuando quieras y sube a Pro si lo necesitas.
             </p>
             <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <a
+                href={DOWNLOAD_URL}
+                className="inline-flex items-center gap-2 rounded-md bg-[var(--color-accent)] px-6 py-3 text-sm font-medium text-white hover:bg-[var(--color-accent-hover)]"
+              >
+                <Download size={16} />
+                Descargar para Windows
+              </a>
               <Link
                 href="/auth/login"
                 className="inline-flex items-center gap-2 rounded-md bg-white px-6 py-3 text-sm font-medium text-[#0a0a0b] hover:bg-[var(--color-text-muted)]"
@@ -458,7 +560,7 @@ export default function HomePage() {
               </Link>
               <Link
                 href="#pricing"
-                className="inline-flex items-center gap-2 rounded-md bg-[var(--color-accent)] px-6 py-3 text-sm font-medium text-white hover:bg-[var(--color-accent-hover)]"
+                className="inline-flex items-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-card)] px-6 py-3 text-sm font-medium text-white hover:border-[var(--color-border-strong)]"
               >
                 <Sparkles size={16} />
                 Ver Pro

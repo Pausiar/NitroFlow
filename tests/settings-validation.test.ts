@@ -62,4 +62,34 @@ describe('sanitizeSettingsUpdate', () => {
     expect(sanitizeSettingsUpdate([1, 2])).toEqual({})
     expect(sanitizeSettingsUpdate(undefined)).toEqual({})
   })
+
+  describe('boolean flags: advancedMode, onboardingDone, createRestorePoints', () => {
+    const flags = ['advancedMode', 'onboardingDone', 'createRestorePoints'] as const
+
+    it.each(flags)('accepts true and false for %s', (flag) => {
+      expect(sanitizeSettingsUpdate({ [flag]: true })).toEqual({ [flag]: true })
+      expect(sanitizeSettingsUpdate({ [flag]: false })).toEqual({ [flag]: false })
+    })
+
+    it.each(flags)('rejects non-boolean values for %s', (flag) => {
+      for (const bad of ['yes', 'true', 1, 0, null, undefined, {}, []]) {
+        expect(sanitizeSettingsUpdate({ [flag]: bad })).toEqual({})
+      }
+    })
+
+    it('keeps the flags alongside other valid settings', () => {
+      expect(
+        sanitizeSettingsUpdate({
+          advancedMode: true,
+          onboardingDone: true,
+          createRestorePoints: false,
+          darkMode: 'no'
+        })
+      ).toEqual({
+        advancedMode: true,
+        onboardingDone: true,
+        createRestorePoints: false
+      })
+    })
+  })
 })

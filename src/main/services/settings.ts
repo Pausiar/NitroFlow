@@ -20,7 +20,10 @@ const DEFAULT_SETTINGS: AppSettings = {
   webApiBaseUrl: DEFAULT_WEB_API_BASE_URL,
   licenseToken: '',
   licenseEmail: '',
-  licensePlan: null
+  licensePlan: null,
+  advancedMode: false,
+  onboardingDone: false,
+  createRestorePoints: true
 }
 
 export class SettingsService {

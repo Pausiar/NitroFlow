@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAppStore } from '../../store/app.store'
-import { Save, Eye, EyeOff, Info } from 'lucide-react'
+import { Save, Eye, EyeOff, Info, BookOpen } from 'lucide-react'
 import type { AppSettings } from '../../../../shared/types'
 
 const AI_MODELS = [
@@ -29,13 +29,32 @@ export function Settings() {
   const handleSave = async () => {
     setIsSaving(true)
     try {
-      await window.electronAPI?.saveSettings(local)
-      setSettings(local)
+      // The welcome-guide flag is owned by the store (see showGuideAgain), so
+      // a stale copy in this form must not overwrite it.
+      const toSave: AppSettings = {
+        ...local,
+        onboardingDone: useAppStore.getState().settings.onboardingDone
+      }
+      const result = (await window.electronAPI?.saveSettings(toSave)) as
+        | { success?: boolean }
+        | undefined
+      if (result?.success === false) throw new Error('save failed')
+      setSettings(toSave)
       addNotification({ type: 'success', message: 'Configuración guardada correctamente' })
     } catch (err) {
       addNotification({ type: 'error', message: 'Error al guardar configuración' })
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  /** Re-opens the welcome guide right away (saved immediately, like the guide itself). */
+  const showGuideAgain = async () => {
+    try {
+      await window.electronAPI?.saveSettings({ onboardingDone: false })
+      setSettings({ ...useAppStore.getState().settings, onboardingDone: false })
+    } catch {
+      addNotification({ type: 'error', message: 'No se pudo abrir la guía de bienvenida' })
     }
   }
 
@@ -54,11 +73,11 @@ export function Settings() {
       <div className="card space-y-4">
         <h2 className="font-semibold text-fluent-text flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-fluent-accent" />
-          Módulo de Inteligencia Artificial (NVIDIA NIM)
+          Asistente IA (NVIDIA NIM)
         </h2>
 
         <div className="space-y-1">
-          <label className="text-sm text-fluent-textMuted">API Key de NVIDIA NIM</label>
+          <label className="text-sm text-fluent-textMuted">Clave de API de NVIDIA (opcional)</label>
           <div className="relative">
             <input
               type={showKey ? 'text' : 'password'}
@@ -69,6 +88,7 @@ export function Settings() {
             />
             <button
               onClick={() => setShowKey(!showKey)}
+              aria-label={showKey ? 'Ocultar clave' : 'Mostrar clave'}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-fluent-textMuted hover:text-fluent-text"
             >
               {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -76,7 +96,7 @@ export function Settings() {
           </div>
           <p className="text-xs text-fluent-textMuted flex items-center gap-1">
             <Info size={11} />
-            Obtén tu clave gratuita en{' '}
+            Solo es necesaria para el Asistente IA. Puedes conseguir una clave gratis en{' '}
             <a
               href="https://build.nvidia.com"
               target="_blank"
@@ -102,49 +122,17 @@ export function Settings() {
         </div>
       </div>
 
-      {/* Optimization Profile */}
-      <div className="card space-y-4">
-        <h2 className="font-semibold text-fluent-text flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-fluent-success" />
-          Perfil de optimización
-        </h2>
-        <div className="grid grid-cols-3 gap-3">
-          {(['quick', 'deep', 'custom'] as const).map((profile) => {
-            const labels = { quick: 'Rápido', deep: 'Profundo', custom: 'Personalizado' }
-            const descs = {
-              quick: 'Limpieza básica y rápida',
-              deep: 'Análisis y limpieza exhaustiva',
-              custom: 'Configura cada opción'
-            }
-            return (
-              <button
-                key={profile}
-                onClick={() => update('optimizationProfile', profile)}
-                className={`p-3 rounded-fluentLg border text-left transition-colors ${
-                  local.optimizationProfile === profile
-                    ? 'border-fluent-accent bg-fluent-accent/10'
-                    : 'border-fluent-border hover:border-fluent-textMuted'
-                }`}
-              >
-                <p className="text-sm font-medium text-fluent-text">{labels[profile]}</p>
-                <p className="text-xs text-fluent-textMuted mt-0.5">{descs[profile]}</p>
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
       {/* Monitoring */}
       <div className="card space-y-4">
         <h2 className="font-semibold text-fluent-text flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-fluent-info" />
-          Monitorización
+          Actualización de datos
         </h2>
 
         <label className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-fluent-text">Monitorización automática</p>
-            <p className="text-xs text-fluent-textMuted">Actualiza métricas en segundo plano</p>
+            <p className="text-sm text-fluent-text">Actualizar datos automáticamente</p>
+            <p className="text-xs text-fluent-textMuted">Refresca las cifras del Panel en segundo plano</p>
           </div>
           <ToggleSwitch checked={local.autoMonitor} onChange={(v) => update('autoMonitor', v)} />
         </label>
@@ -152,7 +140,7 @@ export function Settings() {
         {local.autoMonitor && (
           <div className="space-y-1">
             <label className="text-sm text-fluent-textMuted">
-              Intervalo de actualización: {local.monitorIntervalSeconds}s
+              Cada cuánto se actualiza: {local.monitorIntervalSeconds} s
             </label>
             <input
               type="range"
@@ -168,10 +156,68 @@ export function Settings() {
         <label className="flex items-center justify-between">
           <div>
             <p className="text-sm text-fluent-text">Notificaciones</p>
-            <p className="text-xs text-fluent-textMuted">Muestra alertas sobre el estado del sistema</p>
+            <p className="text-xs text-fluent-textMuted">Muestra avisos sobre el estado del PC</p>
           </div>
           <ToggleSwitch checked={local.notifications} onChange={(v) => update('notifications', v)} />
         </label>
+      </div>
+
+      {/* Safety */}
+      <div className="card space-y-4">
+        <h2 className="font-semibold text-fluent-text flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-fluent-success" />
+          Seguridad
+        </h2>
+
+        <label className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm text-fluent-text">Crear punto de restauración antes de cambios importantes</p>
+            <p className="text-xs text-fluent-textMuted">
+              Si algo sale mal, Windows puede volver a como estaba. Recomendado.
+            </p>
+          </div>
+          <ToggleSwitch
+            checked={local.createRestorePoints}
+            onChange={(v) => update('createRestorePoints', v)}
+          />
+        </label>
+      </div>
+
+      {/* Advanced mode */}
+      <div className="card space-y-4">
+        <h2 className="font-semibold text-fluent-text flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-fluent-warning" />
+          Modo avanzado
+        </h2>
+
+        <label className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm text-fluent-text">Activar modo avanzado</p>
+            <p className="text-xs text-fluent-textMuted">
+              Muestra herramientas para usuarios expertos: registro, procesos y servicios
+            </p>
+          </div>
+          <ToggleSwitch checked={local.advancedMode} onChange={(v) => update('advancedMode', v)} />
+        </label>
+
+        <p className="text-xs text-fluent-textMuted">
+          Si no sabes qué es, déjalo desactivado.
+        </p>
+      </div>
+
+      {/* Welcome guide */}
+      <div className="card space-y-3">
+        <h2 className="font-semibold text-fluent-text flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-fluent-accent" />
+          Ayuda
+        </h2>
+        <p className="text-xs text-fluent-textMuted">
+          Vuelve a ver los pasos iniciales para aprender a usar NitroFlow.
+        </p>
+        <button onClick={showGuideAgain} className="btn-secondary flex items-center gap-2">
+          <BookOpen size={15} />
+          Ver la guía de bienvenida otra vez
+        </button>
       </div>
 
       {/* Save button */}
@@ -186,8 +232,11 @@ export function Settings() {
 function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className={`relative w-10 h-6 rounded-full transition-colors duration-200 overflow-hidden ${
+      className={`relative shrink-0 w-10 h-6 rounded-full transition-colors duration-200 overflow-hidden ${
         checked ? 'bg-fluent-accent' : 'bg-fluent-border'
       }`}
     >
