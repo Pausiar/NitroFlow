@@ -13,6 +13,7 @@ import { History } from './Layout/History'
 import { NotificationStack } from './Layout/NotificationStack'
 import { License } from './License/License'
 import { ConfirmDialog } from './Layout/ConfirmDialog'
+import { Onboarding } from './Layout/Onboarding'
 
 declare global {
   interface Window {
@@ -106,6 +107,7 @@ export function App() {
     <Layout>
       <NotificationStack />
       <ConfirmDialog />
+      <Onboarding />
       {currentPage === 'dashboard' && <Dashboard />}
       {currentPage === 'cleanup' && <Cleanup />}
       {currentPage === 'processes' && <Processes />}
