@@ -101,4 +101,58 @@ describeWin('Windows end-to-end (real PowerShell)', () => {
     expect(fs.existsSync(marker)).toBe(true)
     fs.rmSync(marker, { force: true })
   })
+
+  it('runs the health check and the one-click optimization', async () => {
+    const { HealthService } = await import('../src/main/services/health')
+    const health = new HealthService()
+    const report = await health.scan()
+    expect(report.score).toBeGreaterThanOrEqual(0)
+    expect(report.score).toBeLessThanOrEqual(100)
+    const progress: number[] = []
+    const result = await health.smartOptimize(['cleanup_safe', 'startup_disable_recommended'], (p) =>
+      progress.push(p.percent)
+    )
+    expect(result.restorePoint.message.length).toBeGreaterThan(0)
+    expect(result.results.length).toBe(2)
+    expect(progress.length).toBeGreaterThan(0)
+  })
+
+  it('creates a restore point or explains why not', async () => {
+    const { RestorePointService } = await import('../src/main/services/restore-point')
+    const r = await new RestorePointService().create('NitroFlow CI')
+    expect(r.message.length).toBeGreaterThan(0)
+  })
+
+  it('gaming mode is fully reverted by balanced mode', async () => {
+    const { runPowerShellResult } = await import('../src/main/utils/powershell')
+    const readState = async (): Promise<string> =>
+      (
+        await runPowerShellResult(`
+          $p = 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile'
+          $g = 'HKCU:\\System\\GameConfigStore'
+          $sp = Get-ItemProperty -Path $p -ErrorAction SilentlyContinue
+          $gc = Get-ItemProperty -Path $g -ErrorAction SilentlyContinue
+          $plan = (powercfg /getactivescheme) -join ' '
+          [PSCustomObject]@{
+            SystemResponsiveness = $sp.SystemResponsiveness
+            NetworkThrottlingIndex = $sp.NetworkThrottlingIndex
+            GameDVR = $gc.GameDVR_Enabled
+            Plan = $plan
+          } | ConvertTo-Json -Compress`)
+      ).stdout
+
+    const { OptimizerService } = await import('../src/main/services/optimizer')
+    const optimizer = OptimizerService.getInstance()
+    const before = await readState()
+
+    const gaming = await optimizer.applyMode('gaming')
+    expect(gaming.error).toBeUndefined()
+    expect(gaming.success).toBe(true)
+    expect(await readState()).not.toEqual(before)
+
+    const balanced = await optimizer.applyMode('balanced')
+    expect(balanced.error).toBeUndefined()
+    expect(balanced.success).toBe(true)
+    expect(await readState()).toEqual(before)
+  })
 })

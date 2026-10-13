@@ -127,6 +127,13 @@ export function Cleanup() {
         )
         setSelected((prev) => new Set([...prev].filter((id) => !cleanedIds.has(id))))
 
+        addNotification({
+          type: 'success',
+          message:
+            totalFreed >= 1024
+              ? `Limpieza completada: ${(totalFreed / 1024).toFixed(2)} GB liberados`
+              : `Limpieza completada: ${totalFreed.toFixed(1)} MB liberados`
+        })
         if (res.some((r) => r.requiresAdmin)) {
           addNotification({
             type: 'warning',

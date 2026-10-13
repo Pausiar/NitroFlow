@@ -25,6 +25,11 @@ export interface IpcDependencies {
 }
 
 const PERFORMANCE_MODES: readonly PerformanceMode[] = ['balanced', 'performance', 'gaming']
+const MODE_LABELS: Record<PerformanceMode, string> = {
+  balanced: 'Equilibrado',
+  performance: 'Rendimiento',
+  gaming: 'Juegos'
+}
 const SERVICE_ACTIONS = ['start', 'stop', 'disable'] as const
 type ServiceAction = (typeof SERVICE_ACTIONS)[number]
 
@@ -249,7 +254,6 @@ export function setupIpcHandlers(deps: IpcDependencies): void {
         details: `Categorías limpiadas: ${categoryIds.join(', ')}`,
         reversible: false
       })
-      notify('success', `Limpieza completada: ${totalFreed.toFixed(1)} MB liberados`)
       return results
     } catch (err) {
       log.error('RUN_CLEANUP error:', err)
@@ -359,12 +363,11 @@ export function setupIpcHandlers(deps: IpcDependencies): void {
       if (result.success) {
         recordAction({
           type: 'settings',
-          description: `Modo de rendimiento: ${newMode}`,
-          details: `Se activó el modo "${newMode}" en el optimizador de rendimiento`,
+          description: `Modo de rendimiento: ${MODE_LABELS[newMode]}`,
+          details: `Se activó el modo "${MODE_LABELS[newMode]}" en el optimizador de rendimiento`,
           reversible: previousMode !== newMode,
           undo: previousMode !== newMode ? { kind: 'optimizer', mode: previousMode } : undefined
         })
-        notify('success', `Modo "${newMode}" activado correctamente`)
       }
       return result
     } catch (err) {
