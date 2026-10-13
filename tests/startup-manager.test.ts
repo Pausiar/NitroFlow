@@ -16,6 +16,7 @@ function makeRunner(handler: (script: string) => Reply) {
 const LIST_JSON = JSON.stringify([
   { Id: 'hkcu_Discord', Name: 'Discord', Command: 'C:\\D\\Discord.exe', Location: 'HKCU', Enabled: false, ApprovedName: 'Discord' },
   { Id: 'hklm_OneDrive', Name: 'OneDrive', Command: 'C:\\O\\OneDrive.exe /background', Location: 'HKLM', Enabled: true, ApprovedName: 'OneDrive' },
+  { Id: 'hklm_SecurityHealth', Name: 'SecurityHealth', Command: 'C:\\Windows\\system32\\SecurityHealthSystray.exe', Location: 'HKLM', Enabled: true, ApprovedName: 'SecurityHealth' },
   { Id: 'startup_My App.lnk', Name: 'My App', Command: 'C:\\s\\My App.lnk', Location: 'Startup', Enabled: true, ApprovedName: 'My App.lnk' }
 ])
 
@@ -36,7 +37,7 @@ describe('StartupManager (Windows)', () => {
   it('reads the real enabled state (entries disabled earlier stay disabled)', async () => {
     const { run, calls } = makeRunner(listing)
     const entries = await new StartupManager(run).listEntries()
-    expect(entries.length).toBe(3)
+    expect(entries.length).toBe(4)
     expect(entries[0].enabled).toBe(false)
     expect(entries[1].enabled).toBe(true)
     expect(entries[0].impact).toBe('High')
@@ -100,5 +101,35 @@ describe('StartupManager (Windows)', () => {
   it('rejects unknown ids', async () => {
     const result = await new StartupManager(makeRunner(listing).run).toggleEntry('nope', true)
     expect(result.success).toBe(false)
+  })
+
+  it('attaches recommendation fields to listed entries', async () => {
+    const entries = await new StartupManager(makeRunner(listing).run).listEntries()
+    const discord = entries.find((e) => e.id === 'hkcu_Discord')!
+    expect(discord.recommendation).toBe('disable')
+    expect(discord.recommendationReason).toBeTruthy()
+    expect(discord.essential).toBe(false)
+    const sec = entries.find((e) => e.id === 'hklm_SecurityHealth')!
+    expect(sec.recommendation).toBe('keep')
+    expect(sec.essential).toBe(true)
+    expect(entries.find((e) => e.id === 'startup_My App.lnk')!.recommendation).toBe('optional')
+  })
+
+  it('refuses to disable essential entries without touching the registry', async () => {
+    const { run, calls } = makeRunner(listing)
+    const sm = new StartupManager(run)
+    await sm.listEntries()
+    calls.length = 0
+    const result = await sm.toggleEntry('hklm_SecurityHealth', false)
+    expect(result.success).toBe(false)
+    expect(result.error).toContain('es necesario para la seguridad o el hardware de tu PC')
+    expect(calls.length).toBe(0)
+  })
+
+  it('still allows re-enabling an essential entry', async () => {
+    const { run } = makeRunner(listing)
+    const sm = new StartupManager(run)
+    await sm.listEntries()
+    expect((await sm.toggleEntry('hklm_SecurityHealth', true)).success).toBe(true)
   })
 })

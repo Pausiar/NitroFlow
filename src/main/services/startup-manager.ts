@@ -3,6 +3,7 @@ import { runPowerShellResult } from '../utils/powershell'
 import type { PowerShellRunner } from '../utils/powershell'
 import { describePowerShellError } from '../utils/ps-errors'
 import type { StartupEntry } from '../../shared/types'
+import { classifyStartupEntry } from './startup-knowledge'
 
 const APPROVED_BASE = 'SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved'
 
@@ -102,15 +103,21 @@ export class StartupManager {
       const result: StartupEntry[] = []
       for (const item of items) {
         if (!item || !item.Id) continue
+        const name = String(item.Name ?? '')
+        const command = String(item.Command ?? '')
+        const knowledge = classifyStartupEntry(name, command)
         const entry: StartupEntry = {
           id: String(item.Id),
-          name: String(item.Name ?? ''),
-          command: String(item.Command ?? ''),
+          name,
+          command,
           publisher: '',
           location: (item.Location as StartupEntry['location']) ?? 'HKCU',
           enabled: Boolean(item.Enabled ?? true),
-          impact: this.estimateImpact(String(item.Command ?? '')),
-          description: ''
+          impact: this.estimateImpact(name, command, knowledge.impactHint),
+          description: '',
+          recommendation: knowledge.recommendation,
+          recommendationReason: knowledge.reason,
+          essential: knowledge.essential
         }
         this.entries.set(entry.id, {
           entry,
@@ -146,6 +153,14 @@ export class StartupManager {
     }
 
     const { entry, approvedName } = internal
+    // Never let anyone (UI or one-click optimizer) switch off security
+    // software or hardware drivers. Re-enabling is always allowed.
+    if (!enabled && (entry.essential || classifyStartupEntry(entry.name, entry.command).essential)) {
+      return {
+        success: false,
+        error: `"${entry.name}" es necesario para la seguridad o el hardware de tu PC y no se puede desactivar.`
+      }
+    }
     const approvedKey = APPROVED_KEYS[entry.location]
     if (!approvedKey) {
       return { success: false, error: `Ubicación no soportada: ${entry.location}` }
@@ -173,21 +188,31 @@ export class StartupManager {
     }
   }
 
-  private estimateImpact(command: string): StartupEntry['impact'] {
+  private estimateImpact(
+    name: string,
+    command: string,
+    hint?: StartupEntry['impact']
+  ): StartupEntry['impact'] {
+    if (hint) return hint
     const highImpact = ['chrome', 'teams', 'discord', 'slack', 'spotify', 'onedrive', 'skype']
     const mediumImpact = ['steam', 'adobe', 'dropbox', 'googledrive', 'zoom']
-    const cmd = command.toLowerCase()
+    const cmd = `${name} ${command}`.toLowerCase()
     if (highImpact.some((h) => cmd.includes(h))) return 'High'
     if (mediumImpact.some((m) => cmd.includes(m))) return 'Medium'
     return 'Low'
   }
 
   private getMockEntries(): StartupEntry[] {
-    return [
+    const base: StartupEntry[] = [
       { id: 'hkcu_Teams', name: 'Microsoft Teams', command: 'C:\\...\\Teams.exe --processStart', publisher: 'Microsoft', location: 'HKCU', enabled: true, impact: 'High', description: 'Microsoft Teams' },
       { id: 'hkcu_Discord', name: 'Discord', command: 'C:\\...\\Discord.exe', publisher: 'Discord Inc.', location: 'HKCU', enabled: true, impact: 'High', description: 'Discord' },
       { id: 'hklm_OneDrive', name: 'OneDrive', command: 'C:\\...\\OneDrive.exe /background', publisher: 'Microsoft', location: 'HKLM', enabled: true, impact: 'Medium', description: 'OneDrive' },
-      { id: 'hkcu_Steam', name: 'Steam', command: 'C:\\...\\Steam.exe -silent', publisher: 'Valve', location: 'HKCU', enabled: false, impact: 'Medium', description: 'Steam' }
+      { id: 'hkcu_Steam', name: 'Steam', command: 'C:\\...\\Steam.exe -silent', publisher: 'Valve', location: 'HKCU', enabled: false, impact: 'Medium', description: 'Steam' },
+      { id: 'hklm_SecurityHealth', name: 'SecurityHealth', command: 'C:\\Windows\\system32\\SecurityHealthSystray.exe', publisher: 'Microsoft', location: 'HKLM', enabled: true, impact: 'Low', description: 'Seguridad de Windows' }
     ]
+    return base.map((e) => {
+      const k = classifyStartupEntry(e.name, e.command)
+      return { ...e, recommendation: k.recommendation, recommendationReason: k.reason, essential: k.essential }
+    })
   }
 }

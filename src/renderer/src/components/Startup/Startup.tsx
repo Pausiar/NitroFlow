@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useAppStore } from '../../store/app.store'
-import { RefreshCw, Rocket, AlertTriangle, CheckCircle } from 'lucide-react'
+import { RefreshCw, Rocket, AlertTriangle, CheckCircle, ShieldCheck, Info, Zap, Lock } from 'lucide-react'
 import type { StartupEntry } from '../../../../shared/types'
 
 export function Startup() {
   const { startupEntries, setStartupEntries, addNotification, setLoading, loading, requestConfirm } = useAppStore()
   const [filter, setFilter] = useState('')
+  const [bulkRunning, setBulkRunning] = useState(false)
 
   const isLoading = loading['startup']
 
@@ -45,11 +46,74 @@ export function Startup() {
     }
   }
 
-  const filtered = startupEntries.filter(
-    (e) =>
-      e.name.toLowerCase().includes(filter.toLowerCase()) ||
-      e.publisher.toLowerCase().includes(filter.toLowerCase())
+  // Safe-to-disable apps that are still switched on (never essential ones).
+  const recommendedToDisable = startupEntries.filter(
+    (e) => e.enabled && e.recommendation === 'disable' && !e.essential
   )
+
+  const handleDisableRecommended = async () => {
+    const targets = recommendedToDisable
+    if (targets.length === 0) return
+    const confirmed = await requestConfirm({
+      title: `¿Desactivar ${targets.length} programa(s) del inicio?`,
+      description:
+        `Dejarán de abrirse solos al encender el PC: ${targets.map((e) => e.name).join(', ')}. ` +
+        'No se desinstala nada: podrás abrirlos manualmente y volver a activarlos cuando quieras.',
+      confirmLabel: 'Desactivar recomendados',
+      variant: 'info'
+    })
+    if (!confirmed) return
+
+    setBulkRunning(true)
+    const done = new Set<string>()
+    let failed = 0
+    try {
+      for (const entry of targets) {
+        const result = await window.electronAPI?.toggleStartup(entry.id, false) as { success: boolean; error?: string }
+        if (result?.success) done.add(entry.id)
+        else failed++
+      }
+    } finally {
+      setBulkRunning(false)
+    }
+    if (done.size > 0) {
+      setStartupEntries(startupEntries.map((e) => (done.has(e.id) ? { ...e, enabled: false } : e)))
+    }
+    addNotification({
+      type: failed === 0 ? 'success' : 'warning',
+      message:
+        failed === 0
+          ? `${done.size} programa(s) desactivados del inicio. Tu PC arrancará más rápido.`
+          : `${done.size} desactivado(s); ${failed} no se pudieron cambiar.`
+    })
+  }
+
+  const rank = (e: StartupEntry) =>
+    e.recommendation === 'disable' ? 0 : e.recommendation === 'optional' || !e.recommendation ? 1 : 2
+
+  const filtered = startupEntries
+    .filter(
+      (e) =>
+        e.name.toLowerCase().includes(filter.toLowerCase()) ||
+        e.publisher.toLowerCase().includes(filter.toLowerCase())
+    )
+    .sort(
+      (a, b) =>
+        rank(a) - rank(b) ||
+        Number(b.enabled) - Number(a.enabled) ||
+        a.name.localeCompare(b.name)
+    )
+
+  const badge = (r: StartupEntry['recommendation']) => {
+    switch (r) {
+      case 'disable':
+        return { label: 'Recomendado desactivar', cls: 'text-orange-300 bg-orange-500/15 border-orange-500/30' }
+      case 'keep':
+        return { label: 'Mantener', cls: 'text-fluent-success bg-fluent-success/10 border-fluent-success/30' }
+      default:
+        return { label: 'Opcional', cls: 'text-fluent-textMuted bg-fluent-surface border-fluent-border' }
+    }
+  }
 
   const impactColor = {
     High: 'text-fluent-error',
@@ -81,6 +145,30 @@ export function Startup() {
           Actualizar
         </button>
       </div>
+
+      <div className="flex items-start gap-3 bg-fluent-surface border border-fluent-border rounded-fluentLg p-3">
+        <Info size={16} className="text-fluent-accent flex-shrink-0 mt-0.5" />
+        <p className="text-xs text-fluent-textMuted">
+          Desactivar un programa solo evita que se abra al encender el PC: no se desinstala nada y
+          puedes volver a activarlo cuando quieras (también desde Historial).
+        </p>
+      </div>
+
+      {recommendedToDisable.length > 0 && (
+        <div className="flex items-center justify-between gap-3 bg-fluent-accent/10 border border-fluent-accent/30 rounded-fluentLg p-3">
+          <p className="text-sm text-fluent-text">
+            Encontramos <strong>{recommendedToDisable.length}</strong> programa(s) que puedes desactivar sin riesgo para acelerar el arranque.
+          </p>
+          <button
+            onClick={handleDisableRecommended}
+            disabled={bulkRunning || isLoading}
+            className="btn-primary flex items-center gap-2 flex-shrink-0"
+          >
+            <Zap size={14} />
+            {bulkRunning ? 'Desactivando…' : `Desactivar recomendados (${recommendedToDisable.length})`}
+          </button>
+        </div>
+      )}
 
       {/* Info banner */}
       {highImpactEnabled > 0 && (
@@ -123,7 +211,16 @@ export function Startup() {
                 <span className="text-xs text-fluent-textMuted bg-fluent-surface px-1.5 py-0.5 rounded">
                   {entry.location}
                 </span>
+                <span className={`text-xs font-medium px-1.5 py-0.5 rounded border ${badge(entry.recommendation).cls}`}>
+                  {badge(entry.recommendation).label}
+                </span>
               </div>
+              {entry.recommendationReason && (
+                <p className="text-xs text-fluent-textMuted mt-1 flex items-start gap-1">
+                  {entry.essential && <ShieldCheck size={12} className="text-fluent-success flex-shrink-0 mt-0.5" />}
+                  <span>{entry.recommendationReason}</span>
+                </p>
+              )}
               {entry.publisher && (
                 <p className="text-xs text-fluent-textMuted mt-0.5">{entry.publisher}</p>
               )}
@@ -139,8 +236,17 @@ export function Startup() {
                 <CheckCircle size={12} />
                 {entry.enabled ? 'Habilitado' : 'Deshabilitado'}
               </span>
-              {/* Toggle switch */}
+              {/* Toggle switch (locked for essential entries while enabled) */}
+              {entry.essential && entry.enabled ? (
+                <span
+                  title="Necesario para la seguridad o el hardware de tu PC: no se puede desactivar"
+                  className="flex items-center justify-center w-10 h-6 text-fluent-textMuted"
+                >
+                  <Lock size={14} />
+                </span>
+              ) : (
               <button
+                title={entry.enabled ? 'Desactivar al inicio' : 'Activar al inicio'}
                 onClick={() => handleToggle(entry.id, !entry.enabled)}
                 className={`relative w-10 h-6 rounded-full transition-colors duration-200 overflow-hidden ${
                   entry.enabled ? 'bg-fluent-accent' : 'bg-fluent-border'
@@ -152,6 +258,7 @@ export function Startup() {
                   }`}
                 />
               </button>
+              )}
             </div>
           </div>
         ))}
