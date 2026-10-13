@@ -339,6 +339,20 @@ describe('CleanupService', () => {
       expect(scripts.some((s) => s.includes('$doDelete = $true'))).toBe(false)
     })
 
+    it('never cleans a browser cache when the process list cannot be read (fail closed)', async () => {
+      const scripts: string[] = []
+      const run = jest.fn(async (script: string) => {
+        scripts.push(script)
+        if (script.includes('Get-Process')) return { stdout: '', stderr: 'boom', ok: false }
+        return { stdout: '', stderr: '', ok: true }
+      })
+      const svc = new CleanupService(run, () => ['Default'])
+      const [res] = await svc.clean(['browser_firefox'])
+      expect(res.success).toBe(false)
+      expect(res.skippedReason).toMatch(/No se pudo comprobar si Mozilla Firefox está abierto/)
+      expect(scripts.some((s) => s.includes('$doDelete = $true'))).toBe(false)
+    })
+
     it('computes freedMB from bytes actually deleted and flags locked files', async () => {
       const run = jest.fn(async (script: string) => {
         if (script.includes('Get-Process')) return { stdout: '', stderr: '', ok: true }

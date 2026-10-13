@@ -127,9 +127,13 @@ export function Cleanup() {
         )
         setSelected((prev) => new Set([...prev].filter((id) => !cleanedIds.has(id))))
 
+        const failed = res.filter((r) => !r.success && !r.skippedReason && !r.requiresAdmin)
         addNotification({
-          type: 'success',
+          type: failed.length > 0 && totalFreed === 0 ? 'warning' : 'success',
           message:
+            failed.length > 0 && totalFreed === 0
+              ? 'No se pudo limpiar nada. Inténtalo de nuevo con los programas cerrados.'
+              :
             totalFreed >= 1024
               ? `Limpieza completada: ${(totalFreed / 1024).toFixed(2)} GB liberados`
               : `Limpieza completada: ${totalFreed.toFixed(1)} MB liberados`

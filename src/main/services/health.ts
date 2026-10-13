@@ -518,7 +518,13 @@ export class HealthService {
       onAction({ kind: 'power_plan' })
       return { fixId: 'power_plan_balanced', success: true, message: 'Modo de energía "Equilibrado" activado.' }
     }
-    const result = await this.deps.ps(`powercfg /setactive ${POWER_PLAN_BALANCED}`, 15000)
+    // powercfg reports most failures through its exit code (and stdout), not
+    // stderr: without this check a failed switch was shown as a success.
+    const result = await this.deps.ps(
+      `$out = powercfg /setactive ${POWER_PLAN_BALANCED} 2>&1 | Out-String
+      if ($LASTEXITCODE -ne 0) { [Console]::Error.WriteLine("powercfg: " + $out.Trim()) }`,
+      15000
+    )
     if (!result.ok) {
       return {
         fixId: 'power_plan_balanced',

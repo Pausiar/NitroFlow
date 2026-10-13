@@ -176,8 +176,11 @@ export const useAppStore = create<AppState>((set) => ({
   confirmDialog: null,
   requestConfirm: (options) =>
     new Promise<boolean>((resolve) => {
-      set({
-        confirmDialog: { ...options, id: `${Date.now()}-${Math.random()}`, resolve }
+      set((state) => {
+        // A newer request replaces the open dialog: answer the old one with
+        // "cancel" so its caller does not wait forever.
+        state.confirmDialog?.resolve(false)
+        return { confirmDialog: { ...options, id: `${Date.now()}-${Math.random()}`, resolve } }
       })
     }),
   resolveConfirm: (value) =>

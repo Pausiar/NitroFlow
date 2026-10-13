@@ -472,7 +472,14 @@ export class OptimizerService {
       return fail
     }
     try {
-      const raw = JSON.parse(r.stdout) as {
+      // Windows PowerShell prints warnings ("WARNING: ...") on stdout too:
+      // only the last JSON line is the probe result.
+      const jsonLine =
+        r.stdout
+          .split(/\r?\n/)
+          .reverse()
+          .find((l) => l.trim().startsWith('{')) ?? r.stdout
+      const raw = JSON.parse(jsonLine) as {
         isAdmin?: boolean
         isLaptop?: boolean
         activeScheme?: string | null

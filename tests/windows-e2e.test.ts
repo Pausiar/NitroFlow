@@ -88,8 +88,11 @@ describeWin('Windows end-to-end (real PowerShell)', () => {
     const service = new CleanupService()
     const categories = await service.scan()
     expect(categories.length).toBeGreaterThan(5)
+    // The 1 MB old file must be measured (the scan used to report 0 MB silently).
+    expect(categories.find((c) => c.id === 'temp_user')?.sizeMB ?? 0).toBeGreaterThanOrEqual(1)
     const results = await service.clean(['temp_user'])
     expect(results[0].errors).toEqual([])
+    expect(results[0].freedMB).toBeGreaterThanOrEqual(1)
     expect(fs.existsSync(fresh)).toBe(true)
     expect(fs.existsSync(old)).toBe(false)
     fs.rmSync(fresh, { force: true })

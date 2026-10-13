@@ -131,9 +131,16 @@ function interpret(out: CheckpointOutput): RestorePointResult {
   if (after > before) {
     return { success: true, message: RESTORE_POINT_MESSAGES.created }
   }
-  // No new point: Windows refused because one was created recently.
-  if (warning || (before >= 0 && after === before)) {
+  // No new point but an existing one is still there (or Windows says so
+  // explicitly): it refused because one was created recently. Any other
+  // warning with no point at all must NOT be reported as "still protected".
+  if ((before >= 0 && after === before) || RECENT_POINT_RE.test(warning)) {
     return { success: true, skipped: true, message: RESTORE_POINT_MESSAGES.skipped }
+  }
+  if (warning) {
+    log.warn('RestorePointService: no restore point created:', warning)
+    if (DISABLED_RE.test(warning)) return { success: false, message: RESTORE_POINT_MESSAGES.disabled }
+    return { success: false, message: describeFailure(warning) }
   }
   return {
     success: false,

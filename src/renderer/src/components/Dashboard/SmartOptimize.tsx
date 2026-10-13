@@ -106,7 +106,7 @@ function ScoreRing({ score, busy }: { score: number | null; busy: boolean }) {
 }
 
 export function SmartOptimize() {
-  const { healthReport, setHealthReport, setPage, requestConfirm, addNotification } = useAppStore()
+  const { healthReport, setHealthReport, setPage, requestConfirm, addNotification, settings } = useAppStore()
   const [scanning, setScanning] = useState(false)
   const [optimizing, setOptimizing] = useState(false)
   const [progress, setProgress] = useState<SmartProgress | null>(null)
@@ -178,15 +178,24 @@ export function SmartOptimize() {
   const handleOptimize = async () => {
     if (selectedIssues.length === 0) return
     const steps = selectedIssues.map((i) => (i.fixLabel ?? i.title).toLowerCase()).join('; ')
+    // Emptying the recycle bin deletes files the user threw away (they may be
+    // documents or photos): never promise "nothing personal is deleted" then.
+    const emptiesBin = selectedIssues.some((i) => i.fixId === 'empty_recycle_bin')
     const confirmed = await requestConfirm({
       title: 'Optimizar ahora',
       description:
         `Vamos a: ${steps}. ` +
-        'Antes crearemos un punto de restauración de Windows por seguridad. ' +
-        'No se borrará ningún documento, foto ni archivo personal, y los programas de inicio se pueden volver a activar desde Historial.',
+        (settings.createRestorePoints !== false
+          ? 'Antes crearemos un punto de restauración de Windows por seguridad. '
+          : '') +
+        (emptiesBin
+          ? 'Atención: lo que hay en la Papelera de reciclaje se borrará para siempre y no se podrá recuperar. ' +
+            'Fuera de la Papelera no se borrará ningún documento, foto ni archivo personal.'
+          : 'No se borrará ningún documento, foto ni archivo personal.') +
+        ' Los programas de inicio se pueden volver a activar desde Historial.',
       confirmLabel: 'Optimizar',
       cancelLabel: 'Ahora no',
-      variant: 'info'
+      variant: emptiesBin ? 'warning' : 'info'
     })
     if (!confirmed) return
 

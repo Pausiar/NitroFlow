@@ -133,6 +133,11 @@ export class StartupManager {
     }
   }
 
+  /** Human-readable name of a listed entry (for history messages); undefined if unknown. */
+  getEntryName(id: string): string | undefined {
+    return this.entries.get(id)?.entry.name
+  }
+
   async toggleEntry(id: string, enabled: boolean): Promise<{ success: boolean; error?: string }> {
     if (process.platform !== 'win32') {
       return { success: true }

@@ -45,6 +45,14 @@ describe('StartupManager (Windows)', () => {
     expect(calls[0]).toContain('StartupApproved\\StartupFolder')
   })
 
+  it('exposes the program name of a listed entry for history messages', async () => {
+    const sm = new StartupManager(makeRunner(listing).run)
+    expect(sm.getEntryName('hkcu_Discord')).toBeUndefined()
+    await sm.listEntries()
+    expect(sm.getEntryName('hkcu_Discord')).toBe('Discord')
+    expect(sm.getEntryName('startup_My App.lnk')).toBe('My App')
+  })
+
   it('returns an empty list (not demo programs) when PowerShell output is unusable', async () => {
     const entries = await new StartupManager(makeRunner(() => ({ stdout: 'garbage' })).run).listEntries()
     expect(entries).toEqual([])

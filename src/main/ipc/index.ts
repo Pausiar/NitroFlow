@@ -218,10 +218,12 @@ export function setupIpcHandlers(deps: IpcDependencies): void {
     try {
       const result = await startupManager.toggleEntry(id, enabled)
       if (result.success) {
+        // Show the program name in Historial, not the internal id ("hkcu_Discord").
+        const name = startupManager.getEntryName(id) ?? id
         recordAction({
           type: 'startup',
-          description: `Inicio automático ${enabled ? 'activado' : 'desactivado'}: ${id}`,
-          details: `Entrada de inicio "${id}" ${enabled ? 'habilitada' : 'deshabilitada'}`,
+          description: `Inicio automático ${enabled ? 'activado' : 'desactivado'}: ${name}`,
+          details: `"${name}" ${enabled ? 'volverá a abrirse' : 'ya no se abrirá'} al encender el PC`,
           reversible: true,
           undo: { kind: 'startup', id, enabled: !enabled }
         })

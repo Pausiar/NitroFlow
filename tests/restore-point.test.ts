@@ -86,3 +86,29 @@ describe('RestorePointService', () => {
     expect(calls.length).toBe(0)
   })
 })
+
+describe('RestorePointService (no false "protected" claims)', () => {
+  let originalPlatform: PropertyDescriptor | undefined
+  beforeEach(() => {
+    originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform')
+    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
+  })
+  afterEach(() => {
+    if (originalPlatform) Object.defineProperty(process, 'platform', originalPlatform)
+  })
+
+  it('does not claim a recent point exists when there is none and Windows only warned', async () => {
+    const { run } = makeRunner({ stdout: json({ before: -1, after: -1, warning: 'Something unexpected happened' }) })
+    const result = await new RestorePointService(run).create()
+    expect(result.success).toBe(false)
+    expect(result.skipped).toBeUndefined()
+    expect(result.message).not.toBe(RESTORE_POINT_MESSAGES.skipped)
+  })
+
+  it('still trusts the explicit 24 h warning even if the point list could not be read', async () => {
+    const warning = 'A new system restore point cannot be created because one has already been created within the past 1440 minutes.'
+    const { run } = makeRunner({ stdout: json({ before: -1, after: -1, warning }) })
+    const result = await new RestorePointService(run).create()
+    expect(result).toMatchObject({ success: true, skipped: true })
+  })
+})

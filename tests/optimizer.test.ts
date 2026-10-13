@@ -140,6 +140,15 @@ describe('OptimizerService', () => {
   })
 
   describe('performance / gaming', () => {
+    it('reads the probe result even when Windows PowerShell printed a warning first', async () => {
+      const { service } = create((step) =>
+        step === 'probe' ? { stdout: `WARNING: something harmless\n${probeJson()}` } : undefined
+      )
+      const result = await service.applyMode('performance')
+      expect(result.success).toBe(true)
+      expect(readSnap().activeScheme).toBe(USER_PLAN)
+    })
+
     it('captures a snapshot of the original state before changing anything', async () => {
       let snapshotAtFirstChange: OptimizerSnapshot | null = null
       const { service, runner, settings } = create((step) => {

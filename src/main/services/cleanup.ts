@@ -493,7 +493,7 @@ export class CleanupService {
     const results: CleanupRunResult[] = []
     const categories = CLEANUP_CATEGORIES.filter((c) => categoryIds.includes(c.id))
     const win = process.platform === 'win32'
-    const running = win && categories.some((c) => CATEGORY_RULES[c.id]?.browser)
+    const running: Set<string> | null = win && categories.some((c) => CATEGORY_RULES[c.id]?.browser)
       ? await this.getRunningProcesses()
       : new Set<string>()
 
@@ -543,26 +543,36 @@ export class CleanupService {
     return { roots: [...new Set(roots)], rejected }
   }
 
-  private browserBlock(cat: BaseCategory, running: Set<string>): string | undefined {
+  /** `running` is null when the process list could not be read: fail closed (never clean an open browser). */
+  private browserBlock(cat: BaseCategory, running: Set<string> | null): string | undefined {
     const browser = CATEGORY_RULES[cat.id]?.browser
     if (!browser) return undefined
+    if (!running) {
+      return `No se pudo comprobar si ${browser.label} está abierto. Ciérralo y vuelve a intentarlo`
+    }
     if (browser.processes.some((p) => running.has(p.toLowerCase()))) {
       return `Cierra ${browser.label} para limpiar su caché`
     }
     return undefined
   }
 
-  private async getRunningProcesses(): Promise<Set<string>> {
-    const { stdout } = await this.run(
-      'Get-Process -ErrorAction SilentlyContinue | Select-Object -ExpandProperty ProcessName -Unique',
-      15000
-    )
-    return new Set(
-      stdout
-        .split(/\r?\n/)
-        .map((l) => l.trim().toLowerCase())
-        .filter(Boolean)
-    )
+  /** Running process names, or null if they could not be read (a real Windows always has some). */
+  private async getRunningProcesses(): Promise<Set<string> | null> {
+    try {
+      const { stdout } = await this.run(
+        'Get-Process -ErrorAction SilentlyContinue | Select-Object -ExpandProperty ProcessName -Unique',
+        15000
+      )
+      const names = new Set(
+        stdout
+          .split(/\r?\n/)
+          .map((l) => l.trim().toLowerCase())
+          .filter(Boolean)
+      )
+      return names.size > 0 ? names : null
+    } catch {
+      return null
+    }
   }
 
   private scriptOptionsFor(cat: BaseCategory, roots: string[], doDelete: boolean): ScriptOptions {
@@ -623,7 +633,7 @@ export class CleanupService {
     return { bytes: stats?.size ?? 0, fileCount: stats?.count ?? 0 }
   }
 
-  private async cleanCategory(cat: BaseCategory, running: Set<string>): Promise<CleanupRunResult> {
+  private async cleanCategory(cat: BaseCategory, running: Set<string> | null): Promise<CleanupRunResult> {
     const rule = CATEGORY_RULES[cat.id] ?? {}
     const base = { categoryId: cat.id }
 

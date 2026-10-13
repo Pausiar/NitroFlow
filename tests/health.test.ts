@@ -195,6 +195,14 @@ describe('HealthService.smartOptimize', () => {
     expect(restoreCalls()).toBe(0)
   })
 
+  it('reports a powercfg failure signalled only by its exit code', async () => {
+    const { deps, scripts } = makeDeps()
+    await new HealthService(deps).smartOptimize(['power_plan_balanced'])
+    const script = scripts.find((s) => s.includes('setactive')) ?? ''
+    expect(script).toMatch(/\$LASTEXITCODE -ne 0/)
+    expect(script).toMatch(/\[Console\]::Error\.WriteLine/)
+  })
+
   it('ignores unknown fix ids and reports power plan failures', async () => {
     const { deps, scripts } = makeDeps({ psReply: (s) => (s.includes('setactive') ? { stderr: 'Access is denied' } : {}) })
     const result = await new HealthService(deps).smartOptimize(['power_plan_balanced', 'format_c' as never])
