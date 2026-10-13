@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'claude/**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit -p tsconfig.json
+
+      - name: Unit tests
+        run: npx jest
+
+      # Runs the real PowerShell scripts on this disposable runner (scans,
+      # cleanup of temp files, performance modes and their full restore).
+      - name: Windows end-to-end tests
+        run: npx jest tests/windows-e2e.test.ts
+        env:
+          NITROFLOW_WINDOWS_E2E: '1'
+
+      - name: Build
+        run: npm run build
